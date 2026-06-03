@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-brand-orange: #FF5722;
+  --color-brand-darkBg: #131214;
+  --color-brand-cardBg: #1e1c20;
+  --color-brand-border: #2d2b30;
+  --color-brand-accent: #FF764D;
+  --color-brand-textMain: #F5F5F7;
+  --color-brand-textMuted: #9e9ba1;
+  --font-sans: 'Outfit', 'Inter', sans-serif;
+  --shadow-neon: 0 0 15px rgba(255, 87, 34, 0.35);
+  --shadow-neon-hover: 0 0 25px rgba(255, 87, 34, 0.6);
+}
+
+@layer base {
+  body {
+    @apply bg-brand-darkBg text-brand-textMain font-sans antialiased selection:bg-brand-orange selection:text-white;
+  }
+}
+
+/* Custom Scrollbar to match modern MangaDex theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #131214;
+}
+::-webkit-scrollbar-thumb {
+  background: #2d2b30;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #FF5722;
+}
+
+/* Custom layout glassmorphic styles */
+.glass-panel {
+  background: rgba(30, 28, 32, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-modal {
+  background: rgba(19, 18, 20, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Soft pulse neon glow animation */
+@keyframes neon-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(255, 87, 34, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(255, 87, 34, 0.55);
+  }
+}
+
+.neon-pulse-glow {
+  animation: neon-pulse 3s infinite ease-in-out;
+}
