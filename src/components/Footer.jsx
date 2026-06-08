@@ -111,13 +111,13 @@ export default function Footer() {
 
       {/* Sitemap Drawer Overlay */}
       <div 
-        className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isSitemapOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`} 
+        className={`fixed inset-0 z-50 bg-black/80 transition-opacity duration-300 ${isSitemapOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`} 
         onClick={() => setIsSitemapOpen(false)}
       ></div>
 
       {/* Sitemap Drawer */}
       <div 
-        className={`fixed top-0 right-0 z-[60] h-full w-full sm:w-96 md:w-[450px] bg-brand-darkBg border-l border-brand-border/50 shadow-2xl transition-transform duration-300 ease-in-out transform ${isSitemapOpen ? 'translate-x-0' : 'translate-x-full'} flex flex-col`}
+        className={`fixed top-0 right-0 z-[60] h-full w-full sm:w-96 md:w-[450px] bg-brand-darkBg border-l border-brand-border/50 shadow-2xl transition-transform duration-300 ease-in-out transform will-change-transform ${isSitemapOpen ? 'translate-x-0' : 'translate-x-full'} flex flex-col`}
       >
         {/* Header */}
         <div className="p-6 border-b border-brand-border/50 flex justify-between items-center bg-brand-darkBg/95 backdrop-blur z-10 sticky top-0">
