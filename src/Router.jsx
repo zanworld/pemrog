@@ -32,6 +32,7 @@ import LoginPage from './pages/LoginPage';
 import GalleryPage from './pages/GalleryPage';
 import BookingPage from './pages/BookingPage';
 import BookDetailPage from './pages/BookDetailPage';
+import ReadOnlyPage from './pages/ReadOnlyPage';
 
 export default function AppRouter({ catalogElement, favoritesElement, aboutElement, favorites, onToggleFavorite }) {
   return (
@@ -44,6 +45,7 @@ export default function AppRouter({ catalogElement, favoritesElement, aboutEleme
       <Route path="/login" element={<LoginPage />} />
       <Route path="/booking" element={<BookingPage />} />
       <Route path="/book/:id" element={<BookDetailPage />} />
+      <Route path="/read/:id" element={<ReadOnlyPage />} />
       <Route path="/home" element={<HomePage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/settings" element={<SettingsPage />} />

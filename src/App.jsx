@@ -17,6 +17,7 @@ import AppRouter from './Router';
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
+  const isReaderMode = location.pathname.startsWith('/read/');
 
   // Layout State
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
@@ -281,26 +282,30 @@ export default function App() {
         }}
       />
       {/* Left Navigation Sidebar */}
-      <Sidebar
-        isSidebarOpen={isSidebarOpen}
-        setIsSidebarOpen={setIsSidebarOpen}
-        onInteractiveFilter={handleInteractiveFilter}
-      />
+      {!isReaderMode && (
+        <Sidebar
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+          onInteractiveFilter={handleInteractiveFilter}
+        />
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        <Header
-          favoriteCount={favorites.length}
-          currentPath={location.pathname}
-          isSidebarOpen={isSidebarOpen}
-          setIsSidebarOpen={setIsSidebarOpen}
-          onSearch={(q) => handleInteractiveFilter({ query: q })}
-          currentQuery={filters.query}
-        />
+        {!isReaderMode && (
+          <Header
+            favoriteCount={favorites.length}
+            currentPath={location.pathname}
+            isSidebarOpen={isSidebarOpen}
+            setIsSidebarOpen={setIsSidebarOpen}
+            onSearch={(q) => handleInteractiveFilter({ query: q })}
+            currentQuery={filters.query}
+          />
+        )}
 
         {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
-          <main className="flex-grow mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-[#0a0a0a]">
+          <main className={isReaderMode ? "flex-grow w-full h-full" : "flex-grow mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8"}>
             <AppRouter
               catalogElement={catalogView}
               favoritesElement={favoritesView}
@@ -310,7 +315,7 @@ export default function App() {
             />
           </main>
 
-          <Footer />
+          {!isReaderMode && <Footer />}
         </div>
       </div>
 
