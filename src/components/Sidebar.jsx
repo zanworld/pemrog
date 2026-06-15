@@ -115,6 +115,9 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen, onInteractive
               <NavLink to="/catalog" onClick={() => window.innerWidth <= 768 && setIsSidebarOpen(false)} className={navLinkClasses}>
                 <LayoutDashboard className="h-5 w-5 transition-transform group-hover:scale-110 group-hover:text-brand-orange" /> Catalog
               </NavLink>
+              <NavLink to="/gallery" onClick={() => window.innerWidth <= 768 && setIsSidebarOpen(false)} className={navLinkClasses}>
+                <Compass className="h-5 w-5 transition-transform group-hover:scale-110 group-hover:text-brand-orange" /> Gallery
+              </NavLink>
               <NavLink to="/favorites" onClick={() => window.innerWidth <= 768 && setIsSidebarOpen(false)} className={navLinkClasses}>
                 <Heart className="h-5 w-5 transition-transform group-hover:scale-110 group-hover:text-brand-orange" /> Favorites
               </NavLink>

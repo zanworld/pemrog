@@ -17,7 +17,7 @@ import AppRouter from './Router';
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   // Layout State
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
 
@@ -25,7 +25,7 @@ export default function App() {
   const [mangaList, setMangaList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Favorites State (persisted in LocalStorage)
   const [favorites, setFavorites] = useState(() => {
     const saved = localStorage.getItem('hybrid_library_favorites');
@@ -148,10 +148,10 @@ export default function App() {
       {/* Hero Recommendation Carousel */}
       <HeroCarousel onClickManga={setSelectedManga} mangaList={mangaList} />
 
-      <FilterForm 
-        filters={filters} 
-        setFilters={setFilters} 
-        onSearchSubmit={handleSearchSubmit} 
+      <FilterForm
+        filters={filters}
+        setFilters={setFilters}
+        onSearchSubmit={handleSearchSubmit}
       />
 
       <div className="mt-8">
@@ -160,24 +160,24 @@ export default function App() {
             Manga Catalog ({mangaList?.length || 0} items)
           </h3>
         </div>
-        <MangaGrid 
-          mangaList={mangaList} 
-          favorites={favorites} 
-          isLoading={isLoading} 
-          onToggleFavorite={handleToggleFavorite} 
+        <MangaGrid
+          mangaList={mangaList}
+          favorites={favorites}
+          isLoading={isLoading}
+          onToggleFavorite={handleToggleFavorite}
           onClickCard={setSelectedManga}
         />
 
         {/* Pagination Controls */}
         <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-12 mb-4">
-          <button 
+          <button
             onClick={() => handleInteractiveFilter({ page: Math.max(1, (filters.page || 1) - 1) })}
             disabled={(filters.page || 1) === 1}
             className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold"
           >
             &lt;
           </button>
-          
+
           {[...Array(10)].map((_, i) => {
             const pageNum = i + 1;
             const isActive = (filters.page || 1) === pageNum;
@@ -185,18 +185,17 @@ export default function App() {
               <button
                 key={pageNum}
                 onClick={() => handleInteractiveFilter({ page: pageNum })}
-                className={`flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border text-xs sm:text-sm font-bold transition-all ${
-                  isActive 
-                    ? 'border-brand-orange bg-brand-orange text-white shadow-neon scale-110 z-10' 
-                    : 'border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange'
-                }`}
+                className={`flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border text-xs sm:text-sm font-bold transition-all ${isActive
+                  ? 'border-brand-orange bg-brand-orange text-white shadow-neon scale-110 z-10'
+                  : 'border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange'
+                  }`}
               >
                 {pageNum}
               </button>
             );
           })}
 
-          <button 
+          <button
             onClick={() => handleInteractiveFilter({ page: Math.min(10, (filters.page || 1) + 1) })}
             disabled={(filters.page || 1) === 10}
             className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold"
@@ -229,11 +228,11 @@ export default function App() {
           </p>
         </div>
       ) : (
-        <MangaGrid 
-          mangaList={favorites} 
-          favorites={favorites} 
-          isLoading={false} 
-          onToggleFavorite={handleToggleFavorite} 
+        <MangaGrid
+          mangaList={favorites}
+          favorites={favorites}
+          isLoading={false}
+          onToggleFavorite={handleToggleFavorite}
           onClickCard={setSelectedManga}
         />
       )}
@@ -267,8 +266,8 @@ export default function App() {
 
   return (
     <div className="h-screen flex overflow-hidden bg-brand-darkBg text-brand-textMain select-none">
-      <Toaster 
-        position="bottom-right" 
+      <Toaster
+        position="bottom-right"
         toastOptions={{
           style: {
             background: '#1c1c1e',
@@ -279,19 +278,19 @@ export default function App() {
             fontSize: '14px',
             fontWeight: '600'
           }
-        }} 
+        }}
       />
       {/* Left Navigation Sidebar */}
-      <Sidebar 
-        isSidebarOpen={isSidebarOpen} 
-        setIsSidebarOpen={setIsSidebarOpen} 
+      <Sidebar
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
         onInteractiveFilter={handleInteractiveFilter}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        <Header 
-          favoriteCount={favorites.length} 
+        <Header
+          favoriteCount={favorites.length}
           currentPath={location.pathname}
           isSidebarOpen={isSidebarOpen}
           setIsSidebarOpen={setIsSidebarOpen}
@@ -302,24 +301,24 @@ export default function App() {
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
           <main className="flex-grow mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-            <AppRouter 
-              catalogElement={catalogView} 
-              favoritesElement={favoritesView} 
+            <AppRouter
+              catalogElement={catalogView}
+              favoritesElement={favoritesView}
               aboutElement={aboutView}
               favorites={favorites}
               onToggleFavorite={handleToggleFavorite}
             />
           </main>
-          
+
           <Footer />
         </div>
       </div>
 
       {/* Detail Modal */}
       {selectedManga && (
-        <MangaDetailModal 
-          manga={selectedManga} 
-          onClose={() => setSelectedManga(null)} 
+        <MangaDetailModal
+          manga={selectedManga}
+          onClose={() => setSelectedManga(null)}
           isFavorite={favorites.some(fav => fav.mal_id === selectedManga.mal_id)}
           onToggleFavorite={handleToggleFavorite}
           onInteractiveFilter={handleInteractiveFilter}
