@@ -124,6 +124,9 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen, onInteractive
               <NavLink to="/about" onClick={() => window.innerWidth <= 768 && setIsSidebarOpen(false)} className={navLinkClasses}>
                 <HelpCircle className="h-5 w-5 transition-transform group-hover:scale-110 group-hover:text-brand-orange" /> About
               </NavLink>
+              <NavLink to="/booking" onClick={() => window.innerWidth <= 768 && setIsSidebarOpen(false)} className={navLinkClasses}>
+                <Calendar className="h-5 w-5 transition-transform group-hover:scale-110 group-hover:text-brand-orange" /> Book a Seat
+              </NavLink>
             </nav>
 
             <div className="border-t border-brand-border/60"></div>
