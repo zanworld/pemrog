@@ -29,6 +29,7 @@ import SupernaturalGenrePage from './pages/SupernaturalGenrePage';
 import MysteryGenrePage from './pages/MysteryGenrePage';
 import PublisherPage from './components/PublisherPage';
 import LoginPage from './pages/LoginPage';
+import BookingPage from './pages/BookingPage';
 
 export default function AppRouter({ catalogElement, favoritesElement, aboutElement, favorites, onToggleFavorite }) {
   return (
@@ -38,6 +39,7 @@ export default function AppRouter({ catalogElement, favoritesElement, aboutEleme
       <Route path="/favorites" element={favoritesElement} />
       <Route path="/about" element={aboutElement} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/booking" element={<BookingPage />} />
       <Route path="/home" element={<HomePage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/settings" element={<SettingsPage />} />
