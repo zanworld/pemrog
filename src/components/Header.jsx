@@ -28,7 +28,7 @@ export default function Header({ isSidebarOpen, setIsSidebarOpen, onSearch, curr
       setIsLoading(true);
       setShowSuggestions(true);
       try {
-        const res = await axios.get(`https://api.jikan.moe/v4/manga?q=${query}&limit=5&sfw=true`);
+        const res = await axios.get(`/api/manga?q=${query}&limit=5`);
         setSuggestions(res.data?.data || []);
       } catch (err) {
         console.warn('Autocomplete fetch failed', err);
@@ -109,7 +109,7 @@ export default function Header({ isSidebarOpen, setIsSidebarOpen, onSearch, curr
                  {isLoading ? (
                    <div className="p-4 flex items-center justify-center gap-2 text-sm text-brand-textMuted">
                      <Loader2 className="h-4 w-4 animate-spin text-brand-orange" />
-                     Searching Jikan API...
+                     Searching Local Database...
                    </div>
                  ) : suggestions.length > 0 ? (
                    <div className="overflow-y-auto custom-scrollbar flex-1">
@@ -172,7 +172,7 @@ export default function Header({ isSidebarOpen, setIsSidebarOpen, onSearch, curr
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
             </span>
-            <span>Jikan Active</span>
+            <span>Local DB Active</span>
           </div>
           
           <Link 

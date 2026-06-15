@@ -25,7 +25,6 @@ export default function App() {
   const [mangaList, setMangaList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [usingFallback, setUsingFallback] = useState(false);
   
   // Favorites State (persisted in LocalStorage)
   const [favorites, setFavorites] = useState(() => {
@@ -51,72 +50,11 @@ export default function App() {
     localStorage.setItem('hybrid_library_favorites', JSON.stringify(favorites));
   }, [favorites]);
 
-  // Load Fallback local data
-  const loadFallbackData = (activeFilters = filters) => {
-    let result = [...mockMangaData];
-    
-    if (activeFilters.query) {
-      const q = activeFilters.query.toLowerCase().trim();
-      result = result.filter(item => 
-        item.title.toLowerCase().includes(q) || 
-        (item.title_english && item.title_english.toLowerCase().includes(q))
-      );
-    }
-
-    if (activeFilters.genre) {
-      const genreMap = new Map([
-        ['1', 'Action'], ['2', 'Adventure'], ['4', 'Comedy'], ['8', 'Drama'],
-        ['10', 'Fantasy'], ['22', 'Romance'], ['24', 'Sci-Fi'], ['36', 'Slice of Life'], ['37', 'Supernatural'],
-        ['41', 'Suspense'], ['45', 'Award Winning'], ['46', 'Award Winning']
-      ]);
-      // fallback to genre ID lookup if map fails
-      const genreName = genreMap.get(activeFilters.genre);
-      if (genreName) {
-        result = result.filter(item => item.genres.some(g => g.name === genreName));
-      } else {
-        result = result.filter(item => item.genres.some(g => g.mal_id.toString() === activeFilters.genre.toString()));
-      }
-    }
-
-    if (activeFilters.status && activeFilters.status !== 'all') {
-      const statusMap = new Map([
-        ['publishing', 'Publishing'],
-        ['complete', 'Finished'],
-        ['upcoming', 'Not yet published']
-      ]);
-      const mappedStatus = statusMap.get(activeFilters.status);
-      if (mappedStatus) {
-        result = result.filter(item => item.status === mappedStatus);
-      }
-    }
-
-    if (activeFilters.sortBy === 'popularity') {
-      result.sort((a, b) => (a.popularity || 9999) - (b.popularity || 9999));
-    } else if (activeFilters.sortBy === 'score') {
-      result.sort((a, b) => (b.score || 0) - (a.score || 0));
-    } else if (activeFilters.sortBy === 'title') {
-      result.sort((a, b) => a.title.localeCompare(b.title));
-    }
-
-    const page = activeFilters.page || 1;
-    const limit = 24;
-    const startIndex = (page - 1) * limit;
-    
-    setMangaList(result.slice(startIndex, startIndex + limit));
-  };
-
-  // Fetch from Jikan API using Axios
-  const fetchMangaData = async (forceFallback = false, filtersOverride = null) => {
+  // Fetch from local API
+  const fetchMangaData = async (filtersOverride = null) => {
     setIsLoading(true);
     setError(null);
     const activeFilters = filtersOverride || filters;
-
-    if (forceFallback) {
-      setUsingFallback(true);
-      loadFallbackData(activeFilters);
-      setIsLoading(false);
-      return;
-    }
 
     try {
       const queryParams = new URLSearchParams();
@@ -125,7 +63,6 @@ export default function App() {
       if (activeFilters.query) queryParams.append('q', activeFilters.query);
       if (activeFilters.genre) queryParams.append('genres', activeFilters.genre);
       if (activeFilters.status && activeFilters.status !== 'all') queryParams.append('status', activeFilters.status);
-      if (activeFilters.sfw) queryParams.append('sfw', 'true');
 
       if (activeFilters.sortBy === 'popularity') {
         queryParams.append('order_by', 'popularity');
@@ -138,22 +75,19 @@ export default function App() {
         queryParams.append('sort', 'asc');
       }
 
-      const apiUrl = `https://api.jikan.moe/v4/manga?${queryParams.toString()}`;
+      const apiUrl = `/api/manga?${queryParams.toString()}`;
       const response = await axios.get(apiUrl);
 
       if (response.data && response.data.data) {
         // Enforce uniqueness to prevent Jikan API duplicates
         const uniqueData = response.data.data.filter((v, i, a) => a.findIndex(v2 => (v2.mal_id === v.mal_id)) === i);
         setMangaList(uniqueData);
-        setUsingFallback(false);
       } else {
         throw new Error("Response empty or invalid");
       }
     } catch (err) {
-      console.warn("Public API error or rate limit hit. Switching to mock library dataset.", err);
-      setError("Database rate-limit active. Showing high-performance local offline catalog.");
-      setUsingFallback(true);
-      loadFallbackData(activeFilters);
+      console.warn("Backend API error.", err);
+      setError("Unable to connect to the backend database.");
     } finally {
       setIsLoading(false);
     }
@@ -177,7 +111,7 @@ export default function App() {
     if (targetFilter) {
       const newFilters = { ...filters, query: '', genre: '', status: 'all', ...targetFilter };
       setFilters(newFilters);
-      fetchMangaData(false, newFilters);
+      fetchMangaData(newFilters);
       navigate('/catalog', { replace: true });
     }
   }, [location.pathname]);
@@ -202,7 +136,7 @@ export default function App() {
     setFilters(newFilters);
     setSelectedManga(null);
     navigate('/catalog');
-    fetchMangaData(false, newFilters);
+    fetchMangaData(newFilters);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -214,18 +148,6 @@ export default function App() {
       {/* Hero Recommendation Carousel */}
       <HeroCarousel onClickManga={setSelectedManga} mangaList={mangaList} />
 
-      {usingFallback && (
-        <div className="mb-6 flex items-start gap-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 p-4 text-sm text-amber-200">
-          <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <h4 className="font-bold">Offline Catalog Mode Active</h4>
-            <p className="text-xs text-amber-200/80 mt-1">
-              The public API database is currently rate-limited or offline. We've automatically loaded our highly detailed offline backup. Search filters, sorting, and details still work flawlessly!
-            </p>
-          </div>
-        </div>
-      )}
-
       <FilterForm 
         filters={filters} 
         setFilters={setFilters} 
@@ -235,16 +157,8 @@ export default function App() {
       <div className="mt-8">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-bold tracking-wide">
-            {usingFallback ? 'Backup Catalog' : 'Manga Catalog'} ({mangaList?.length || 0} items)
+            Manga Catalog ({mangaList?.length || 0} items)
           </h3>
-          {usingFallback && (
-            <button 
-              onClick={() => fetchMangaData(false)}
-              className="text-xs text-brand-orange hover:underline font-semibold"
-            >
-              Retry Live Database
-            </button>
-          )}
         </div>
         <MangaGrid 
           mangaList={mangaList} 

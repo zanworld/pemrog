@@ -1,9 +1,13 @@
 import express from 'express';
 import cors from 'cors';
+import mangaRoutes from './routes/mangaRoutes.js';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Register manga routes
+app.use('/api', mangaRoutes);
 
 // Mock Database in memory
 const users = [

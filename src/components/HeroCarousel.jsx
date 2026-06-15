@@ -140,7 +140,7 @@ export default function HeroCarousel({ onClickManga, mangaList, useLiveApi = tru
     const fetchFresh = async () => {
       if (useLiveApi) {
         try {
-          const res = await axios.get('https://api.jikan.moe/v4/manga?order_by=popularity&sort=asc&limit=25&sfw=true');
+          const res = await axios.get('/api/manga?order_by=popularity&limit=24');
           if (res.data?.data?.length > 0) {
             buildSlides(res.data.data);
             return;

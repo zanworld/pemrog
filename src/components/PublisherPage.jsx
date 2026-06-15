@@ -36,13 +36,7 @@ export default function PublisherPage({ publisherId, favorites = [], onToggleFav
     setIsLoading(true);
     setError(null);
     try {
-      let url = `https://api.jikan.moe/v4/manga?order_by=popularity&sort=asc&limit=24&sfw=true&page=${page}`;
-      
-      if (publisher.jikanIds) {
-        url += `&magazines=${publisher.jikanIds}`;
-      } else if (publisher.q) {
-        url += `&q=${encodeURIComponent(publisher.q)}`;
-      }
+      const url = `/api/manga?q=${encodeURIComponent(publisher.name)}&limit=24&page=${page}`;
 
       const res = await axios.get(url);
       if (res.data && res.data.data) {
@@ -53,21 +47,9 @@ export default function PublisherPage({ publisherId, favorites = [], onToggleFav
         throw new Error('Empty response');
       }
     } catch (err) {
-      console.warn('Publisher fetch failed, using fallback', err);
-      setError('API rate-limited. Showing available data.');
-      // Try to load from mock if available
-      try {
-        const { mockMangaData } = await import('../mockMangaData');
-        let filtered = [...mockMangaData];
-        // Sort by popularity locally
-        filtered.sort((a, b) => (a.popularity || 9999) - (b.popularity || 9999));
-        
-        // Paginate locally
-        const startIndex = (page - 1) * 24;
-        setMangaList(filtered.slice(startIndex, startIndex + 24));
-      } catch {
-        setMangaList([]);
-      }
+      console.warn('Publisher fetch failed', err);
+      setError('Failed to fetch data from the server.');
+      setMangaList([]);
     } finally {
       setIsLoading(false);
     }

@@ -36,7 +36,7 @@ export default function GenrePage({ genreId, favorites = [], onToggleFavorite })
     setIsLoading(true);
     setError(null);
     try {
-      const res = await axios.get(`https://api.jikan.moe/v4/manga?genres=${genreId}&order_by=popularity&sort=asc&limit=24&sfw=true&page=${page}`);
+      const res = await axios.get(`/api/manga?genres=${genreId}&order_by=popularity&sort=asc&limit=24&page=${page}`);
       if (res.data && res.data.data) {
         // Enforce uniqueness to prevent Jikan API duplicates
         const uniqueData = res.data.data.filter((v, i, a) => a.findIndex(v2 => (v2.mal_id === v.mal_id)) === i);
@@ -45,21 +45,9 @@ export default function GenrePage({ genreId, favorites = [], onToggleFavorite })
         throw new Error('Empty response');
       }
     } catch (err) {
-      console.warn('Genre fetch failed, using fallback', err);
-      setError('API rate-limited. Showing available data.');
-      // Try to load from mock if available
-      try {
-        const { mockMangaData } = await import('../mockMangaData');
-        let filtered = mockMangaData.filter(m => m.genres.some(g => g.mal_id === genreId));
-        // Sort by popularity locally
-        filtered.sort((a, b) => (a.popularity || 9999) - (b.popularity || 9999));
-        
-        // Paginate locally
-        const startIndex = (page - 1) * 24;
-        setMangaList(filtered.slice(startIndex, startIndex + 24));
-      } catch {
-        setMangaList([]);
-      }
+      console.warn('Genre fetch failed', err);
+      setError('Failed to fetch data from the server.');
+      setMangaList([]);
     } finally {
       setIsLoading(false);
     }
