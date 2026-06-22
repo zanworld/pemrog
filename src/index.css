@@ -2,14 +2,44 @@
 
 @import "tailwindcss";
 
+:root {
+  --app-orange: #FF5722;
+  --app-darkBg: #f9fafb;
+  --app-cardBg: #ffffff;
+  --app-border: #e5e7eb;
+  --app-accent: #FF764D;
+  --app-textMain: #111827;
+  --app-textMuted: #6b7280;
+  
+  --glass-bg: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(0, 0, 0, 0.05);
+  --modal-bg: rgba(249, 250, 251, 0.98);
+  --modal-border: rgba(0, 0, 0, 0.08);
+}
+
+:root.dark {
+  --app-orange: #FF5722;
+  --app-darkBg: #131214;
+  --app-cardBg: #1e1c20;
+  --app-border: #2d2b30;
+  --app-accent: #FF764D;
+  --app-textMain: #F5F5F7;
+  --app-textMuted: #9e9ba1;
+
+  --glass-bg: rgba(30, 28, 32, 0.95);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --modal-bg: rgba(19, 18, 20, 0.98);
+  --modal-border: rgba(255, 255, 255, 0.08);
+}
+
 @theme {
-  --color-brand-orange: #FF5722;
-  --color-brand-darkBg: #131214;
-  --color-brand-cardBg: #1e1c20;
-  --color-brand-border: #2d2b30;
-  --color-brand-accent: #FF764D;
-  --color-brand-textMain: #F5F5F7;
-  --color-brand-textMuted: #9e9ba1;
+  --color-brand-orange: var(--app-orange);
+  --color-brand-darkBg: var(--app-darkBg);
+  --color-brand-cardBg: var(--app-cardBg);
+  --color-brand-border: var(--app-border);
+  --color-brand-accent: var(--app-accent);
+  --color-brand-textMain: var(--app-textMain);
+  --color-brand-textMuted: var(--app-textMuted);
   --font-sans: 'Outfit', 'Inter', sans-serif;
   --shadow-neon: 0 0 15px rgba(255, 87, 34, 0.35);
   --shadow-neon-hover: 0 0 25px rgba(255, 87, 34, 0.6);
@@ -17,7 +47,7 @@
 
 @layer base {
   body {
-    @apply bg-brand-darkBg text-brand-textMain font-sans antialiased selection:bg-brand-orange selection:text-white;
+    @apply bg-brand-darkBg text-brand-textMain font-sans antialiased selection:bg-brand-orange selection:text-white transition-colors duration-300;
   }
 }
 
@@ -27,25 +57,25 @@
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #131214;
+  background: var(--app-darkBg);
 }
 ::-webkit-scrollbar-thumb {
-  background: #2d2b30;
+  background: var(--app-border);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #FF5722;
+  background: var(--app-orange);
 }
 
 /* Custom layout glassmorphic styles */
 .glass-panel {
-  background: rgba(30, 28, 32, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
 }
 
 .glass-modal {
-  background: rgba(19, 18, 20, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--modal-bg);
+  border: 1px solid var(--modal-border);
 }
 
 /* Soft pulse neon glow animation */
