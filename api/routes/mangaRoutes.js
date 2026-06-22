@@ -63,7 +63,7 @@ router.get('/manga', (req, res) => {
   
   // Pagination
   const parsedPage = parseInt(page, 10) || 1;
-  const parsedLimit = Math.min(parseInt(limit, 10) || 12, 24);
+  const parsedLimit = parseInt(limit, 10) || 12;
   const startIndex = (parsedPage - 1) * parsedLimit;
   
   const paginatedData = result.slice(startIndex, startIndex + parsedLimit);
