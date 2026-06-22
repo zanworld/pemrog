@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Clock, CheckCircle, ArrowRight, ChevronLeft, CalendarCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -10,8 +10,21 @@ export default function BookingPage() {
   const [formData, setFormData] = useState({ date: '', slot: '' });
   const [selectedSeat, setSelectedSeat] = useState(null);
 
+  const [dynamicBookedSeats, setDynamicBookedSeats] = useState([]);
+
+  useEffect(() => {
+    if (formData.date && formData.slot) {
+      const history = JSON.parse(localStorage.getItem('booking_history') || '[]');
+      const booked = history
+        .filter(b => b.date === formData.date && b.slot === formData.slot)
+        .map(b => b.seat);
+      setDynamicBookedSeats(booked);
+    }
+  }, [formData]);
+
   // Mock booked seats (hardcoded)
-  const bookedSeats = [3, 7, 12, 18, 25];
+  const baseMockSeats = [3, 7, 12, 18, 25];
+  const bookedSeats = [...new Set([...baseMockSeats, ...dynamicBookedSeats])];
 
   const sessions = [
     { id: 'Pagi', time: '08:00 - 12:00' },

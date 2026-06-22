@@ -168,6 +168,7 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen, onInteractive
                 { name: 'Reading History', path: '/readinghistory' },
                 { name: 'Read Later', path: '/readlater' },
                 { name: 'Bookmarks', path: '/bookmarks' },
+                { name: 'Booking History', path: '/booking/history' },
                 { name: 'Profile', path: '/profile' },
                 { name: 'Settings', path: '/settings' },
                 { name: 'Help & FAQ', path: '/helpfaq' },
