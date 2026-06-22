@@ -3,13 +3,13 @@
 @import "tailwindcss";
 
 :root {
-  --app-orange: #00f0ff;
-  --app-darkBg: #f4f4f5;
+  --app-orange: #FF5722;
+  --app-darkBg: #f9fafb;
   --app-cardBg: #ffffff;
-  --app-border: #e4e4e7;
-  --app-accent: #bf00ff;
-  --app-textMain: #09090b;
-  --app-textMuted: #71717a;
+  --app-border: #e5e7eb;
+  --app-accent: #FF764D;
+  --app-textMain: #111827;
+  --app-textMuted: #6b7280;
   
   --glass-bg: rgba(255, 255, 255, 0.95);
   --glass-border: rgba(0, 0, 0, 0.05);
@@ -18,18 +18,18 @@
 }
 
 :root.dark {
-  --app-orange: #00f0ff;
-  --app-darkBg: #09090b;
-  --app-cardBg: #121214;
-  --app-border: #27272a;
-  --app-accent: #bf00ff;
+  --app-orange: #FF5722;
+  --app-darkBg: #131214;
+  --app-cardBg: #1e1c20;
+  --app-border: #2d2b30;
+  --app-accent: #FF764D;
   --app-textMain: #F5F5F7;
-  --app-textMuted: #a1a1aa;
+  --app-textMuted: #9e9ba1;
 
-  --glass-bg: rgba(18, 18, 20, 0.95);
-  --glass-border: rgba(0, 240, 255, 0.15);
-  --modal-bg: rgba(9, 9, 11, 0.98);
-  --modal-border: rgba(0, 240, 255, 0.15);
+  --glass-bg: rgba(30, 28, 32, 0.95);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --modal-bg: rgba(19, 18, 20, 0.98);
+  --modal-border: rgba(255, 255, 255, 0.08);
 }
 
 @theme {
@@ -41,8 +41,8 @@
   --color-brand-textMain: var(--app-textMain);
   --color-brand-textMuted: var(--app-textMuted);
   --font-sans: 'Outfit', 'Inter', sans-serif;
-  --shadow-neon: 0 0 15px rgba(0, 240, 255, 0.4);
-  --shadow-neon-hover: 0 0 25px rgba(191, 0, 255, 0.6);
+  --shadow-neon: 0 0 15px rgba(255, 87, 34, 0.35);
+  --shadow-neon-hover: 0 0 25px rgba(255, 87, 34, 0.6);
 }
 
 @layer base {
@@ -81,10 +81,10 @@
 /* Soft pulse neon glow animation */
 @keyframes neon-pulse {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+    box-shadow: 0 0 15px rgba(255, 87, 34, 0.25);
   }
   50% {
-    box-shadow: 0 0 25px rgba(191, 0, 255, 0.6);
+    box-shadow: 0 0 25px rgba(255, 87, 34, 0.55);
   }
 }
 
