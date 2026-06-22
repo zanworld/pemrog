@@ -5,9 +5,11 @@ import axios from 'axios';
 import {
   ArrowLeft, BookOpen, Bookmark, BookmarkCheck, Star,
   TrendingUp, Calendar, User, BookOpenCheck, Layers,
-  Hash, Eye
+  Hash, Eye, Share2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import RatingStars from '../components/RatingStars';
+import ReviewSection from '../components/ReviewSection';
 
 // ── Animation Variants ──────────────────────────────────────
 const pageVariants = {
@@ -135,11 +137,19 @@ export default function BookDetailPage() {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
   const [recsLoading, setRecsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('Sinopsis');
+  const [userRating, setUserRating] = useState(0);
 
   // ─── Check bookmark status on mount / id change ───
   useEffect(() => {
     const bookmarks = JSON.parse(localStorage.getItem('hybrid_library_bookmarks') || '[]');
     setIsBookmarked(bookmarks.some(b => b.mal_id === parseInt(id)));
+  }, [id]);
+
+  // ─── Check user rating on mount / id change ───
+  useEffect(() => {
+    const ratings = JSON.parse(localStorage.getItem('hybrid_library_ratings') || '{}');
+    setUserRating(ratings[id] || 0);
   }, [id]);
 
   // ─── Fetch manga detail ───
@@ -204,6 +214,28 @@ export default function BookDetailPage() {
       setIsBookmarked(true);
       toast.success('Bookmarked successfully!');
     }
+  };
+
+  // ─── User rating handler ───
+  const handleRatingChange = (newRating) => {
+    setUserRating(newRating);
+    const ratings = JSON.parse(localStorage.getItem('hybrid_library_ratings') || '{}');
+    ratings[id] = newRating;
+    localStorage.setItem('hybrid_library_ratings', JSON.stringify(ratings));
+    toast.success(`Terima kasih! Anda memberi rating ${newRating} bintang.`);
+  };
+
+  // ─── Share link handler ───
+  const handleShare = () => {
+    const currentUrl = window.location.href;
+    navigator.clipboard.writeText(currentUrl)
+      .then(() => {
+        toast.success('Tautan halaman berhasil disalin ke clipboard!');
+      })
+      .catch((err) => {
+        console.error('Gagal menyalin tautan:', err);
+        toast.error('Gagal menyalin tautan.');
+      });
   };
 
   // ─── Error state ───
@@ -341,27 +373,48 @@ export default function BookDetailPage() {
                 Read Online
               </button>
 
-              {/* Bookmark */}
-              <button
-                onClick={handleBookmark}
-                className={`w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold border transition-all duration-200 ${
-                  isBookmarked
-                    ? 'bg-brand-orange/15 border-brand-orange text-brand-orange hover:bg-brand-orange/25'
-                    : 'bg-brand-cardBg border-brand-border text-brand-textMain hover:border-brand-orange/50 hover:text-brand-orange'
-                }`}
-              >
-                {isBookmarked ? (
-                  <>
-                    <BookmarkCheck className="h-4 w-4 fill-brand-orange" />
-                    Bookmarked
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="h-4 w-4" />
-                    Add Bookmark
-                  </>
+              {/* Bookmark & Share */}
+              <div className="flex gap-2 w-full">
+                <button
+                  onClick={handleBookmark}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold border transition-all duration-200 ${
+                    isBookmarked
+                      ? 'bg-brand-orange/15 border-brand-orange text-brand-orange hover:bg-brand-orange/25 neon-pulse-glow shadow-neon'
+                      : 'bg-brand-cardBg border-brand-border text-brand-textMain hover:border-brand-orange/50 hover:text-brand-orange'
+                  }`}
+                >
+                  {isBookmarked ? (
+                    <>
+                      <BookmarkCheck className="h-4 w-4 fill-brand-orange text-brand-orange" />
+                      Bookmarked
+                    </>
+                  ) : (
+                    <>
+                      <Bookmark className="h-4 w-4" />
+                      Bookmark
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleShare}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold border bg-brand-cardBg border-brand-border text-brand-textMain hover:border-brand-orange/50 hover:text-brand-orange transition-all duration-200 cursor-pointer"
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share
+                </button>
+              </div>
+
+              {/* User Rating Panel */}
+              <div className="mt-1 p-3 bg-brand-cardBg border border-brand-border/60 rounded-xl flex flex-col items-center justify-center shadow-sm">
+                <p className="text-[10px] font-bold text-brand-textMuted uppercase tracking-wider mb-2">Beri Rating</p>
+                <RatingStars value={userRating} onChange={handleRatingChange} readOnly={false} />
+                {userRating > 0 && (
+                  <span className="text-[9px] font-bold text-brand-orange mt-2 bg-brand-orange/10 px-2.5 py-0.5 rounded-full border border-brand-orange/20">
+                    Rating Anda: {userRating} / 5
+                  </span>
                 )}
-              </button>
+              </div>
             </div>
           </motion.div>
 
@@ -446,16 +499,73 @@ export default function BookDetailPage() {
               </div>
             </div>
 
-            {/* ─ Synopsis ─ */}
-            <div>
-              <h3 className="text-xs font-semibold text-brand-textMuted uppercase tracking-wider mb-3">
-                Synopsis
-              </h3>
-              <div className="bg-brand-darkBg/40 border border-brand-border/30 rounded-xl p-4 sm:p-5">
-                <p className="text-sm leading-relaxed text-brand-textMuted whitespace-pre-line">
-                  {synopsis}
-                </p>
-              </div>
+            {/* ─ Tabs Navigation ─ */}
+            <div className="flex border-b border-brand-border/40 mb-6 mt-8 overflow-x-auto gap-2 sm:gap-4 no-scrollbar">
+              {['Sinopsis', 'Daftar Chapter', 'Ulasan'].map((tab) => {
+                const isActive = activeTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`relative py-3 px-4 sm:px-6 text-sm font-bold transition-colors whitespace-nowrap cursor-pointer ${
+                      isActive ? 'text-brand-orange font-extrabold' : 'text-brand-textMuted hover:text-brand-orange'
+                    }`}
+                  >
+                    {tab}
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeTabUnderline"
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-orange rounded-full"
+                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* ─ Tabs Content ─ */}
+            <div className="min-h-[250px]">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  {activeTab === 'Sinopsis' && (
+                    <div className="bg-brand-darkBg/40 border border-brand-border/30 rounded-xl p-4 sm:p-5">
+                      <p className="text-sm leading-relaxed text-brand-textMuted whitespace-pre-line">
+                        {synopsis}
+                      </p>
+                    </div>
+                  )}
+
+                  {activeTab === 'Daftar Chapter' && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {Array.from({ length: 20 }, (_, i) => i + 1).map((ch) => (
+                        <button
+                          key={ch}
+                          onClick={() => navigate(`/read/${manga.mal_id}?chapter=${ch}`)}
+                          className="flex flex-col items-start p-3 bg-brand-cardBg/65 border border-brand-border/45 hover:border-brand-orange/50 hover:bg-brand-orange/5 hover:shadow-sm rounded-xl transition-all text-left group cursor-pointer"
+                        >
+                          <span className="text-xs font-bold text-brand-textMain group-hover:text-brand-orange transition-colors">
+                            Chapter {ch}
+                          </span>
+                          <span className="text-[10px] text-brand-textMuted mt-0.5">
+                            Klik untuk membaca
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {activeTab === 'Ulasan' && (
+                    <ReviewSection mangaId={manga.mal_id} />
+                  )}
+                </motion.div>
+              </AnimatePresence>
             </div>
 
           </motion.div>

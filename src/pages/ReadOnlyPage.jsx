@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, Settings, 
@@ -15,6 +15,15 @@ const TOTAL_PAGES = 10;
 export default function ReadOnlyPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const chapter = searchParams.get('chapter');
+
+  // Toast current chapter
+  useEffect(() => {
+    if (chapter) {
+      toast.success(`Membaca Chapter ${chapter}`);
+    }
+  }, [chapter]);
 
   // Load saved preferences
   const getSavedPage = () => {
