@@ -64,6 +64,7 @@ export default function App() {
       if (activeFilters.query) queryParams.append('q', activeFilters.query);
       if (activeFilters.genre) queryParams.append('genres', activeFilters.genre);
       if (activeFilters.status && activeFilters.status !== 'all') queryParams.append('status', activeFilters.status);
+      if (activeFilters.sfw) queryParams.append('sfw', 'true');
 
       if (activeFilters.sortBy === 'popularity') {
         queryParams.append('order_by', 'popularity');

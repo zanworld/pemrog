@@ -14,7 +14,7 @@ const router = express.Router();
 router.get('/manga', async (req, res) => {
   try {
     const {
-      q, genres, status,
+      q, genres, status, sfw,
       order_by = 'popularity', sort = 'desc',
       page = 1, limit = 12,
     } = req.query;
@@ -30,6 +30,13 @@ router.get('/manga', async (req, res) => {
     if (q) params.q = q;
     if (genres) params.genres = genres;
     if (status && status !== 'all') params.status = status.toLowerCase();
+    
+    // Explicitly filter out NSFW/Erotic content if sfw mode is active
+    if (sfw === 'true') {
+      params.sfw = true;
+      // 12 = Hentai, 49 = Erotica, 9 = Ecchi, 28 = Boys Love, 26 = Girls Love, 43 = Doujinshi
+      params.genres_exclude = '12,49,9,28,26,43';
+    }
     
     // Jikan supports sort by title, start_date, end_date, chapters, volumes, score, scored_by, rank, popularity, members, favorites
     if (order_by) params.order_by = order_by;
