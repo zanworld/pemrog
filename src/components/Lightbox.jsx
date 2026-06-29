@@ -17,7 +17,12 @@ export default function Lightbox({ manga, onClose }) {
 
   if (!manga) return null;
 
-  const imageUrl = manga.images?.jpg?.large_image_url || manga.images?.jpg?.image_url;
+  // Support both MangaDex (coverUrl) and Jikan (images.jpg.*) formats
+  const imageUrl =
+    manga.coverUrl ||
+    manga.images?.jpg?.large_image_url ||
+    manga.images?.jpg?.image_url ||
+    '';
 
   return (
     <AnimatePresence>

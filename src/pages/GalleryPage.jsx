@@ -1,200 +1,230 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronDown, Image as ImageIcon, AlertCircle, RefreshCw, Heart, Maximize2, LayoutGrid, Layout } from 'lucide-react';
+import {
+  Search, ChevronDown, Image as ImageIcon, AlertCircle,
+  RefreshCw, Heart, Maximize2, LayoutGrid, Layout, Tag
+} from 'lucide-react';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
 import Lightbox from '../components/Lightbox';
 
+const BATCH_SIZE = 16;
+
+// ── MangaDex helpers ─────────────────────────────────────────────
+function getCoverUrl(manga) {
+  const rel = (manga.relationships || []).find((r) => r.type === 'cover_art');
+  const fn = rel?.attributes?.fileName;
+  return fn
+    ? `https://uploads.mangadex.org/covers/${manga.id}/${fn}.512.jpg`
+    : null;
+}
+
+function getTitle(manga) {
+  const t = manga.attributes?.title || {};
+  return t.en || t['ja-ro'] || Object.values(t)[0] || 'Unknown';
+}
+
+function getGenres(manga) {
+  return (manga.attributes?.tags || [])
+    .filter((t) => t.attributes?.group === 'genre')
+    .slice(0, 2)
+    .map((t) => ({
+      id: t.id,
+      name: t.attributes?.name?.en || Object.values(t.attributes?.name || {})[0] || '',
+    }));
+}
+
+// ── Component ────────────────────────────────────────────────────
 export default function GalleryPage() {
   const navigate = useNavigate();
 
-  // Data states
-  const [mangaList, setMangaList] = useState([]);
-  const [filteredManga, setFilteredManga] = useState([]);
-  const [displayedManga, setDisplayedManga] = useState([]);
-  const [genres, setGenres] = useState([]);
+  // ── Data states ──
+  const [mangas, setMangas] = useState([]);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [error, setError] = useState(null);
 
-  // Pagination state
-  const [page, setPage] = useState(1);
-  const itemsPerPage = 12;
+  // ── Tag/Genre states ──
+  const [tags, setTags] = useState([]);
 
-  // Filter and Sort states
+  // ── Filter states ──
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [selectedGenre, setSelectedGenre] = useState('');
-  const [sortBy, setSortBy] = useState('popularity'); // 'popularity', 'score', 'title', 'newest'
+  const [selectedTag, setSelectedTag] = useState('');
+  const [sortBy, setSortBy] = useState('popularity');
 
-  // View & Interaction states
-  const [viewMode, setViewMode] = useState('masonry'); // 'masonry' or 'grid'
+  // ── View / Interaction states ──
+  const [viewMode, setViewMode] = useState('masonry');
   const [lightboxManga, setLightboxManga] = useState(null);
   const [favorites, setFavorites] = useState(() => {
-    const saved = localStorage.getItem('favorites');
-    return saved ? JSON.parse(saved) : [];
+    try { return JSON.parse(localStorage.getItem('gallery_favorites') || '[]'); }
+    catch { return []; }
   });
 
-  // Fetch manga data on mount (fetch all available data up to a high limit for client-side ops)
-  const fetchManga = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await axios.get('/api/manga?limit=100');
-      if (response.data && response.data.data) {
-        // Enforce uniqueness
-        const uniqueData = response.data.data.filter(
-          (v, i, a) => a.findIndex(v2 => v2.mal_id === v.mal_id) === i
-        );
-        setMangaList(uniqueData);
-
-        // Extract unique genres
-        const extractedGenres = [];
-        const seenGenreIds = new Set();
-        uniqueData.forEach(manga => {
-          if (manga.genres && Array.isArray(manga.genres)) {
-            manga.genres.forEach(genre => {
-              if (!seenGenreIds.has(genre.mal_id)) {
-                seenGenreIds.add(genre.mal_id);
-                extractedGenres.push(genre);
-              }
-            });
-          }
-        });
-
-        extractedGenres.sort((a, b) => a.name.localeCompare(b.name));
-        setGenres(extractedGenres);
-      } else {
-        throw new Error('Valid data was not received from the server.');
-      }
-    } catch (err) {
-      console.error('Error fetching gallery manga:', err);
-      setError('Gagal memuat galeri manga. Silakan coba lagi nanti.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Keep filter params in a ref to avoid stale closures inside fetchBatch
+  const filterRef = useRef({ debouncedQuery: '', selectedTag: '', sortBy: 'popularity' });
   useEffect(() => {
-    fetchManga();
+    filterRef.current = { debouncedQuery, selectedTag, sortBy };
+  }, [debouncedQuery, selectedTag, sortBy]);
+
+  // ── Fetch tags on mount ──────────────────────────────────────
+  useEffect(() => {
+    axios.get('/api/manga/tag')
+      .then(({ data }) => {
+        if (data?.data) {
+          const genreTags = data.data
+            .filter((t) => t.attributes?.group === 'genre')
+            .map((t) => ({
+              id: t.id,
+              name: t.attributes?.name?.en || Object.values(t.attributes?.name || {})[0] || '',
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          setTags(genreTags);
+        }
+      })
+      .catch((err) => console.warn('Failed to load tags:', err.message));
   }, []);
 
-  // Save favorites to localStorage
+  // ── Core fetch function ──────────────────────────────────────
+  const fetchBatch = useCallback(async (currentOffset, isReset = false) => {
+    if (currentOffset === 0 || isReset) {
+      setIsLoading(true);
+      setError(null);
+    } else {
+      setIsFetchingMore(true);
+    }
+
+    const { debouncedQuery: q, selectedTag: tag, sortBy: sb } = filterRef.current;
+
+    try {
+      const params = new URLSearchParams();
+      params.append('limit', BATCH_SIZE);
+      params.append('offset', currentOffset);
+      params.append('sortBy', sb);
+      if (q.trim()) params.append('title', q.trim());
+      if (tag) params.append('includedTags[]', tag);
+
+      const { data } = await axios.get(`/api/manga?${params.toString()}`);
+
+      const items = data?.data || [];
+      const mdTotal = data?.total ?? 9999;
+
+      setMangas((prev) => (isReset || currentOffset === 0 ? items : [...prev, ...items]));
+      const newOffset = currentOffset + items.length;
+      setOffset(newOffset);
+      setTotal(mdTotal);
+      setHasMore(items.length === BATCH_SIZE && newOffset < mdTotal);
+    } catch (err) {
+      console.error('Error fetching manga from MangaDex:', err);
+      if (currentOffset === 0 || isReset) {
+        setError('Gagal memuat galeri manga. Periksa koneksi internet dan coba lagi.');
+      }
+    } finally {
+      setIsLoading(false);
+      setIsFetchingMore(false);
+    }
+  }, []);
+
+  // ── Initial fetch ────────────────────────────────────────────
   useEffect(() => {
-    localStorage.setItem('favorites', JSON.stringify(favorites));
+    fetchBatch(0, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Re-fetch when filters change ─────────────────────────────
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    setMangas([]);
+    setOffset(0);
+    setHasMore(true);
+    fetchBatch(0, true);
+  }, [debouncedQuery, selectedTag, sortBy, fetchBatch]);
+
+  // ── Debounce search ──────────────────────────────────────────
+  useEffect(() => {
+    const h = setTimeout(() => setDebouncedQuery(searchQuery), 500);
+    return () => clearTimeout(h);
+  }, [searchQuery]);
+
+  // ── Persist favorites ────────────────────────────────────────
+  useEffect(() => {
+    localStorage.setItem('gallery_favorites', JSON.stringify(favorites));
   }, [favorites]);
 
-  const toggleFavorite = (e, mal_id) => {
+  const toggleFavorite = (e, id) => {
     e.stopPropagation();
-    setFavorites(prev => 
-      prev.includes(mal_id) ? prev.filter(id => id !== mal_id) : [...prev, mal_id]
+    setFavorites((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
 
-  // Search query debounce
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, 400);
-    return () => clearTimeout(handler);
-  }, [searchQuery]);
-
-  // Apply filtering and sorting
-  useEffect(() => {
-    let result = [...mangaList];
-
-    // Filter by genre
-    if (selectedGenre) {
-      const genreId = parseInt(selectedGenre, 10);
-      result = result.filter(manga =>
-        manga.genres && manga.genres.some(genre => genre.mal_id === genreId)
-      );
-    }
-
-    // Filter by search query
-    if (debouncedQuery) {
-      const query = debouncedQuery.toLowerCase().trim();
-      result = result.filter(manga => {
-        const titleMatch = manga.title && manga.title.toLowerCase().includes(query);
-        const englishTitleMatch = manga.title_english && manga.title_english.toLowerCase().includes(query);
-        return titleMatch || englishTitleMatch;
-      });
-    }
-
-    // Sort
-    result.sort((a, b) => {
-      if (sortBy === 'score') {
-        return (b.score || 0) - (a.score || 0);
-      } else if (sortBy === 'popularity') {
-        return (a.popularity || 99999) - (b.popularity || 99999);
-      } else if (sortBy === 'title') {
-        return (a.title || '').localeCompare(b.title || '');
-      } else if (sortBy === 'newest') {
-        const dateA = new Date(a.published?.string?.split(' to')[0] || 0);
-        const dateB = new Date(b.published?.string?.split(' to')[0] || 0);
-        return dateB - dateA;
-      }
-      return 0;
-    });
-
-    setFilteredManga(result);
-    setPage(1); // Reset pagination when filters change
-  }, [debouncedQuery, selectedGenre, sortBy, mangaList]);
-
-  // Update displayed manga based on pagination
-  useEffect(() => {
-    setDisplayedManga(filteredManga.slice(0, page * itemsPerPage));
-  }, [filteredManga, page]);
-
-  // Infinite Scroll Callback
+  // ── Infinite scroll ──────────────────────────────────────────
   const loadMore = useCallback(() => {
-    if (displayedManga.length < filteredManga.length) {
-      // Add a slight artificial delay to show loading state smoothly
-      setTimeout(() => {
-        setPage(prev => prev + 1);
-        setIsFetching(false);
-      }, 300);
-    } else {
+    if (isFetchingMore || !hasMore) {
       setIsFetching(false);
+      return;
     }
-  }, [displayedManga.length, filteredManga.length]);
+    fetchBatch(offset);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFetchingMore, hasMore, offset, fetchBatch]);
 
   const [observerRef, isFetching, setIsFetching] = useInfiniteScroll(loadMore);
 
+  // Reset scroll hook state once async fetch finishes
+  useEffect(() => {
+    if (!isFetchingMore && isFetching) setIsFetching(false);
+  }, [isFetchingMore, isFetching, setIsFetching]);
+
   const handleResetFilters = () => {
     setSearchQuery('');
-    setSelectedGenre('');
+    setSelectedTag('');
     setSortBy('popularity');
   };
 
-  const skeletonHeights = ['h-64', 'h-80', 'h-72', 'h-96', 'h-60', 'h-84', 'h-76', 'h-90', 'h-72', 'h-80', 'h-64', 'h-88'];
+  // ── Skeleton heights for masonry ─────────────────────────────
+  const skeletonH = ['h-64', 'h-80', 'h-72', 'h-96', 'h-60', 'h-84',
+    'h-76', 'h-90', 'h-72', 'h-80', 'h-64', 'h-88',
+    'h-72', 'h-96', 'h-60', 'h-80'];
 
+  const hasActiveFilter = searchQuery || selectedTag || sortBy !== 'popularity';
+
+  // ── Render ───────────────────────────────────────────────────
   return (
     <div className="space-y-8 animate-fade-in max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-      
-      {/* Lightbox Modal */}
+
+      {/* Lightbox */}
       <Lightbox manga={lightboxManga} onClose={() => setLightboxManga(null)} />
 
       {/* Page Header */}
       <div className="border-b border-brand-border/60 pb-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-brand-orange/10 border border-brand-orange/20 text-brand-orange shadow-neon/20">
+            <div className="p-2.5 rounded-xl bg-brand-orange/10 border border-brand-orange/20 text-brand-orange">
               <ImageIcon className="h-6 w-6" />
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-brand-textMain">
-                Manga <span className="bg-gradient-to-r from-brand-orange to-brand-accent bg-clip-text text-transparent">Gallery</span>
+                Manga{' '}
+                <span className="bg-gradient-to-r from-brand-orange to-brand-accent bg-clip-text text-transparent">
+                  Gallery
+                </span>
               </h1>
-              <p className="text-sm text-brand-textMuted mt-1">
-                Jelajahi seni visual cover manga favorit Anda.
+              <p className="text-sm text-brand-textMuted mt-1 flex items-center gap-1.5">
+                <Tag className="h-3.5 w-3.5 text-brand-orange" />
+                Data langsung dari MangaDex
               </p>
             </div>
           </div>
-          
+
           {/* View Toggles */}
           <div className="hidden sm:flex bg-brand-darkBg border border-brand-border rounded-lg p-1">
             <button
+              id="gallery-view-masonry"
               onClick={() => setViewMode('masonry')}
               className={`p-1.5 rounded-md transition-colors ${viewMode === 'masonry' ? 'bg-brand-orange text-white' : 'text-brand-textMuted hover:text-brand-textMain'}`}
               title="Masonry View"
@@ -202,6 +232,7 @@ export default function GalleryPage() {
               <Layout className="w-5 h-5" />
             </button>
             <button
+              id="gallery-view-grid"
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-brand-orange text-white' : 'text-brand-textMuted hover:text-brand-textMain'}`}
               title="Grid View"
@@ -215,12 +246,14 @@ export default function GalleryPage() {
       {/* Filter and Control Bar */}
       <div className="glass-panel p-4 rounded-2xl border border-brand-border/60 flex flex-col xl:flex-row gap-4">
         <div className="flex flex-col sm:flex-row gap-3 flex-grow">
-          {/* Title Search Input */}
+
+          {/* Search */}
           <div className="relative flex-grow">
             <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-brand-textMuted">
               <Search className="h-4 w-4" />
             </span>
             <input
+              id="gallery-search"
               type="text"
               placeholder="Cari manga berdasarkan judul..."
               value={searchQuery}
@@ -229,17 +262,18 @@ export default function GalleryPage() {
             />
           </div>
 
-          {/* Genre Dropdown Selector */}
-          <div className="relative min-w-[160px]">
+          {/* Genre / Tag Dropdown */}
+          <div className="relative min-w-[170px]">
             <select
-              value={selectedGenre}
-              onChange={(e) => setSelectedGenre(e.target.value)}
-              className="w-full appearance-none pl-4 pr-10 py-2.5 rounded-xl border border-brand-border bg-brand-darkBg text-brand-textMain placeholder-brand-textMuted focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all duration-200 text-sm cursor-pointer"
+              id="gallery-genre-filter"
+              value={selectedTag}
+              onChange={(e) => setSelectedTag(e.target.value)}
+              className="w-full appearance-none pl-4 pr-10 py-2.5 rounded-xl border border-brand-border bg-brand-darkBg text-brand-textMain focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all duration-200 text-sm cursor-pointer"
             >
               <option value="">Semua Genre</option>
-              {genres.map(genre => (
-                <option key={genre.mal_id} value={genre.mal_id}>
-                  {genre.name}
+              {tags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
                 </option>
               ))}
             </select>
@@ -248,15 +282,16 @@ export default function GalleryPage() {
             </span>
           </div>
 
-          {/* Sort Dropdown Selector */}
+          {/* Sort Dropdown */}
           <div className="relative min-w-[160px]">
             <select
+              id="gallery-sort"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="w-full appearance-none pl-4 pr-10 py-2.5 rounded-xl border border-brand-border bg-brand-darkBg text-brand-textMain placeholder-brand-textMuted focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all duration-200 text-sm cursor-pointer"
+              className="w-full appearance-none pl-4 pr-10 py-2.5 rounded-xl border border-brand-border bg-brand-darkBg text-brand-textMain focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all duration-200 text-sm cursor-pointer"
             >
               <option value="popularity">Terpopuler</option>
-              <option value="score">Skor Tertinggi</option>
+              <option value="relevance">Relevansi</option>
               <option value="title">Judul (A-Z)</option>
               <option value="newest">Terbaru</option>
             </select>
@@ -266,13 +301,22 @@ export default function GalleryPage() {
           </div>
         </div>
 
-        {/* Counter Display & Reset Option */}
+        {/* Counter + Reset */}
         <div className="flex items-center justify-between xl:justify-end gap-4 shrink-0">
-          <span className="text-sm font-semibold text-brand-textMuted bg-brand-cardBg px-4 py-2 rounded-xl border border-brand-border/40">
-            Menampilkan <span className="text-brand-orange font-bold">{filteredManga.length}</span> manga
-          </span>
-          {(searchQuery || selectedGenre || sortBy !== 'popularity') && (
+          {!isLoading && (
+            <span className="text-sm font-semibold text-brand-textMuted bg-brand-cardBg px-4 py-2 rounded-xl border border-brand-border/40">
+              {mangas.length > 0 ? (
+                <>
+                  Memuat{' '}
+                  <span className="text-brand-orange font-bold">{mangas.length}</span>
+                  {total > 0 && <> / {total}</>} manga
+                </>
+              ) : 'Tidak ada hasil'}
+            </span>
+          )}
+          {hasActiveFilter && !isLoading && (
             <button
+              id="gallery-reset-filters"
               onClick={handleResetFilters}
               className="text-xs font-bold text-brand-orange hover:text-brand-accent transition-colors"
             >
@@ -282,31 +326,40 @@ export default function GalleryPage() {
         </div>
       </div>
 
-      {/* Main Content Render */}
-      {isLoading ? (
-        <div className={viewMode === 'masonry' ? "columns-2 md:columns-3 lg:columns-4 gap-4" : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"}>
-          {Array.from({ length: 12 }).map((_, idx) => (
+      {/* ── Main Content ─────────────────────────────────────────── */}
+
+      {/* Loading skeleton (initial load) */}
+      {isLoading && (
+        <div className={viewMode === 'masonry'
+          ? 'columns-2 md:columns-3 lg:columns-4 gap-4'
+          : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'}>
+          {Array.from({ length: 16 }).map((_, idx) => (
             <div
               key={idx}
-              className={`break-inside-avoid ${viewMode === 'masonry' ? 'mb-4' : ''} bg-brand-cardBg/60 border border-brand-border/30 rounded-xl animate-pulse ${
-                viewMode === 'masonry' ? skeletonHeights[idx % skeletonHeights.length] : 'aspect-[2/3]'
-              }`}
+              className={`break-inside-avoid ${viewMode === 'masonry' ? 'mb-4' : ''} bg-brand-cardBg/60 border border-brand-border/30 rounded-xl animate-pulse ${viewMode === 'masonry' ? skeletonH[idx % skeletonH.length] : 'aspect-[2/3]'}`}
             />
           ))}
         </div>
-      ) : error ? (
+      )}
+
+      {/* Error state */}
+      {!isLoading && error && (
         <div className="flex flex-col items-center justify-center py-20 px-4 text-center rounded-2xl border border-red-500/20 bg-red-500/5 max-w-xl mx-auto">
           <AlertCircle className="h-12 w-12 text-red-500 mb-4 stroke-1" />
           <h3 className="text-lg font-bold text-brand-textMain mb-1">Gagal Memuat Galeri</h3>
           <p className="text-sm text-brand-textMuted mb-6 max-w-xs">{error}</p>
           <button
-            onClick={fetchManga}
+            id="gallery-retry"
+            onClick={() => fetchBatch(0, true)}
             className="flex items-center gap-2 px-5 py-2.5 bg-brand-orange hover:bg-brand-accent text-white font-bold rounded-xl shadow-neon transition-all duration-200 text-sm"
           >
-            <RefreshCw className="h-4 w-4 animate-spin-hover" /> Coba Lagi
+            <RefreshCw className="h-4 w-4" /> Coba Lagi
           </button>
         </div>
-      ) : displayedManga.length === 0 ? (
+      )}
+
+      {/* Empty state */}
+      {!isLoading && !error && mangas.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 px-4 text-center rounded-2xl border border-brand-border bg-brand-cardBg/30 max-w-lg mx-auto">
           <ImageIcon className="h-12 w-12 text-brand-textMuted mb-4 stroke-1" />
           <h3 className="text-lg font-bold text-brand-textMain mb-1">Tidak Ada Manga Ditemukan</h3>
@@ -320,44 +373,67 @@ export default function GalleryPage() {
             Reset Semua Filter
           </button>
         </div>
-      ) : (
+      )}
+
+      {/* Manga grid / masonry */}
+      {!isLoading && !error && mangas.length > 0 && (
         <>
-          <div className={viewMode === 'masonry' ? "columns-2 md:columns-3 lg:columns-4 gap-4" : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"}>
+          <div className={viewMode === 'masonry'
+            ? 'columns-2 md:columns-3 lg:columns-4 gap-4'
+            : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'}>
             <AnimatePresence>
-              {displayedManga.map((manga) => {
-                const isFavorite = favorites.includes(manga.mal_id);
+              {mangas.map((manga) => {
+                const id = manga.id;
+                const title = getTitle(manga);
+                const coverUrl = getCoverUrl(manga);
+                const genres = getGenres(manga);
+                const isFavorite = favorites.includes(id);
+
                 return (
                   <motion.div
-                    key={manga.mal_id}
-                    layoutId={`manga-gallery-card-${manga.mal_id}`}
+                    key={id}
+                    layoutId={`gallery-card-${id}`}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.3 }}
                     className={`break-inside-avoid ${viewMode === 'masonry' ? 'mb-4' : ''} group relative overflow-hidden rounded-xl border border-brand-border/60 hover:border-brand-orange/80 hover:shadow-neon cursor-pointer transition-all duration-300`}
-                    onClick={() => navigate(`/book/${manga.mal_id}`)}
+                    onClick={() => navigate(`/book/${id}`)}
                   >
-                    <div className="relative overflow-hidden aspect-auto bg-brand-cardBg h-full">
-                      <img
-                        src={manga.images?.jpg?.large_image_url || manga.images?.jpg?.image_url}
-                        alt={manga.title}
-                        className={`w-full object-cover transition-transform duration-500 group-hover:scale-105 ${viewMode === 'grid' ? 'h-full aspect-[2/3]' : ''}`}
-                        loading="lazy"
-                      />
+                    <div className={`relative overflow-hidden bg-brand-cardBg ${viewMode === 'grid' ? 'aspect-[2/3]' : ''}`}>
+                      {coverUrl ? (
+                        <img
+                          src={coverUrl}
+                          alt={title}
+                          className={`w-full object-cover transition-transform duration-500 group-hover:scale-105 ${viewMode === 'grid' ? 'h-full' : ''}`}
+                          loading="lazy"
+                          onError={(e) => {
+                            // Fallback to non-thumbnail version
+                            const fallback = coverUrl.replace('.512.jpg', '');
+                            if (e.target.src !== fallback) e.target.src = fallback;
+                          }}
+                        />
+                      ) : (
+                        <div className={`flex items-center justify-center bg-brand-cardBg/80 ${viewMode === 'grid' ? 'h-full' : 'h-64'}`}>
+                          <ImageIcon className="h-10 w-10 text-brand-border" />
+                        </div>
+                      )}
 
-                      {/* Action Buttons Overlay */}
+                      {/* Action Buttons */}
                       <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
                         <button
-                          onClick={(e) => toggleFavorite(e, manga.mal_id)}
+                          id={`gallery-fav-${id}`}
+                          onClick={(e) => toggleFavorite(e, id)}
                           className="p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-brand-orange/80 transition-colors"
-                          title={isFavorite ? "Hapus dari Favorit" : "Tambah ke Favorit"}
+                          title={isFavorite ? 'Hapus dari Favorit' : 'Tambah ke Favorit'}
                         >
                           <Heart className={`w-4 h-4 ${isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
                         </button>
                         <button
+                          id={`gallery-lightbox-${id}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setLightboxManga(manga);
+                            setLightboxManga({ id, title, coverUrl, genres });
                           }}
                           className="p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-brand-orange/80 transition-colors"
                           title="Perbesar Cover"
@@ -369,25 +445,18 @@ export default function GalleryPage() {
                       {/* Info Overlay */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
                         <h4 className="text-brand-textMain font-bold text-sm sm:text-base tracking-wide line-clamp-2 drop-shadow">
-                          {manga.title}
+                          {title}
                         </h4>
-                        
-                        {manga.genres && manga.genres.length > 0 && (
+                        {genres.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5">
-                            {manga.genres.slice(0, 2).map((g) => (
+                            {genres.map((g) => (
                               <span
-                                key={g.mal_id}
+                                key={g.id}
                                 className="text-[10px] px-1.5 py-0.5 rounded bg-brand-orange/25 text-brand-orange border border-brand-orange/30 font-semibold"
                               >
                                 {g.name}
                               </span>
                             ))}
-                          </div>
-                        )}
-
-                        {manga.score && (
-                          <div className="flex items-center gap-1 mt-2 text-xs font-black text-brand-orange drop-shadow">
-                            <span className="text-yellow-400">★</span> {manga.score.toFixed(2)}
                           </div>
                         )}
                       </div>
@@ -397,18 +466,27 @@ export default function GalleryPage() {
               })}
             </AnimatePresence>
           </div>
-          
-          {/* Infinite Scroll Loading Indicator */}
-          {displayedManga.length < filteredManga.length && (
+
+          {/* Infinite scroll sentinel */}
+          {hasMore && (
             <div ref={observerRef} className="py-8 flex justify-center items-center">
-              {isFetching ? (
+              {(isFetching || isFetchingMore) ? (
                 <div className="flex flex-col items-center gap-3">
                   <RefreshCw className="h-6 w-6 text-brand-orange animate-spin" />
-                  <span className="text-sm font-medium text-brand-textMuted">Memuat batch berikutnya...</span>
+                  <span className="text-sm font-medium text-brand-textMuted">
+                    Memuat batch berikutnya dari MangaDex...
+                  </span>
                 </div>
               ) : (
-                <div className="h-8" /> // Invisible spacer to trigger intersection
+                <div className="h-8" />
               )}
+            </div>
+          )}
+
+          {/* End of results */}
+          {!hasMore && mangas.length > 0 && (
+            <div className="py-6 text-center text-sm text-brand-textMuted">
+              ✓ Semua <span className="text-brand-orange font-bold">{mangas.length}</span> manga sudah dimuat
             </div>
           )}
         </>
@@ -416,4 +494,3 @@ export default function GalleryPage() {
     </div>
   );
 }
-
