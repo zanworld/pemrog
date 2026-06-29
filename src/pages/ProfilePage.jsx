@@ -2,15 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Mail, Edit2, Check, X, Heart, Bookmark, BookOpen, Calendar, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
 
+  const { user, token } = useAuth();
+
   // User State
   const [profile, setProfile] = useState({
-    name: 'Hybrid Reader',
-    email: 'reader@hybrid.lib',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Hybrid'
+    name: user?.name || 'Guest User',
+    email: user?.email || 'Not logged in',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + (user?.name || 'Guest')
   });
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
@@ -26,53 +30,50 @@ export default function ProfilePage() {
   const [favoriteList, setFavoriteList] = useState([]);
 
   useEffect(() => {
-    // Load Profile
-    const savedProfile = localStorage.getItem('user_profile');
-    if (savedProfile) {
-      setProfile(JSON.parse(savedProfile));
+    // Update profile if user changes
+    if (user) {
+      setProfile({
+        name: user.name,
+        email: user.email,
+        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.name
+      });
     }
 
-    // Load Stats & Favorites
+    const fetchStats = async () => {
+      try {
+        if (token) {
+          const response = await axios.get('/api/profile/stats');
+          if (response.data.success) {
+            setStats({
+              favorites: response.data.stats.favorites,
+              bookmarks: response.data.stats.bookmarks,
+              bookings: response.data.stats.bookings,
+              lastRead: response.data.stats.last_manga_read || 'None'
+            });
+          }
+        } else {
+           // Fallback to local storage if not logged in
+           const favs = JSON.parse(localStorage.getItem('hybrid_library_favorites') || '[]');
+           setStats(s => ({ ...s, favorites: favs.length }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch stats", error);
+      }
+    };
+    
+    fetchStats();
+
+    // Load Favorites for Showcase
     const favs = JSON.parse(localStorage.getItem('hybrid_library_favorites') || '[]');
     setFavoriteList(favs);
     
-    const bkmks = JSON.parse(localStorage.getItem('hybrid_library_bookmarks') || '[]');
-    const bking = JSON.parse(localStorage.getItem('booking_history') || '[]');
-
-    // Find Last Read
-    let lastReadTitle = 'None';
-    let latestTime = 0;
-    
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('reading_progress_')) {
-        try {
-          const progressData = JSON.parse(localStorage.getItem(key));
-          if (progressData && progressData.timestamp && progressData.timestamp > latestTime) {
-            latestTime = progressData.timestamp;
-            // Try to extract title from data or just use ID
-            lastReadTitle = progressData.mangaTitle || `Manga ID: ${key.split('_')[2]}`;
-          }
-        } catch (e) {
-          // Ignore parsing errors
-        }
-      }
-    }
-
-    setStats({
-      favorites: favs.length,
-      bookmarks: bkmks.length,
-      bookings: bking.length,
-      lastRead: lastReadTitle !== 'None' ? lastReadTitle : (favs.length > 0 ? favs[0].title : 'None') // fallback if no reading progress
-    });
-
-  }, []);
+  }, [user, token]);
 
   const handleSaveProfile = () => {
     if (!editName.trim()) return;
     const newProfile = { ...profile, name: editName };
     setProfile(newProfile);
-    localStorage.setItem('user_profile', JSON.stringify(newProfile));
+    // In a real app, update this via API.
     setIsEditing(false);
   };
 

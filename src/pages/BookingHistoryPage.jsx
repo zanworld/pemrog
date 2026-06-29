@@ -3,25 +3,48 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Clock, Trash2, Check, X, QrCode } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 export default function BookingHistoryPage() {
   const [bookings, setBookings] = useState([]);
   const [filter, setFilter] = useState('upcoming'); // 'upcoming' or 'completed'
   const [confirmCancelId, setConfirmCancelId] = useState(null);
 
-  useEffect(() => {
-    const history = JSON.parse(localStorage.getItem('booking_history') || '[]');
-    // Sort by newest bookedAt
-    history.sort((a, b) => new Date(b.bookedAt) - new Date(a.bookedAt));
-    setBookings(history);
-  }, []);
+  const { token } = useAuth();
 
-  const handleCancel = (bookingToCancel) => {
-    const updated = bookings.filter(b => b.bookedAt !== bookingToCancel.bookedAt);
-    setBookings(updated);
-    localStorage.setItem('booking_history', JSON.stringify(updated));
-    setConfirmCancelId(null);
-    toast.success('Booking cancelled successfully');
+  const fetchBookings = async () => {
+    if (token) {
+      try {
+        const response = await axios.get('/api/bookings', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.data.success) {
+          setBookings(response.data.bookings);
+        }
+      } catch (error) {
+        console.error("Failed to fetch bookings:", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchBookings();
+  }, [token]);
+
+  const handleCancel = async (bookingToCancel) => {
+    try {
+      const response = await axios.delete(`/api/bookings/${bookingToCancel.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        toast.success('Booking cancelled successfully');
+        setConfirmCancelId(null);
+        fetchBookings();
+      }
+    } catch (error) {
+      toast.error('Failed to cancel booking');
+    }
   };
 
   const today = new Date().toISOString().split('T')[0];
@@ -80,12 +103,12 @@ export default function BookingHistoryPage() {
           )}
 
           {filteredBookings.map((booking) => {
-            const isConfirming = confirmCancelId === booking.bookedAt;
-            const qrData = JSON.stringify({ d: booking.date, s: booking.slot, st: booking.seat });
+            const isConfirming = confirmCancelId === booking.id;
+            const qrData = JSON.stringify({ id: booking.id, d: booking.date, s: booking.slot, st: booking.seat });
             
             return (
               <motion.div
-                key={booking.bookedAt}
+                key={booking.id}
                 layout
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -144,7 +167,7 @@ export default function BookingHistoryPage() {
                       </div>
                     ) : (
                       <button
-                        onClick={() => setConfirmCancelId(booking.bookedAt)}
+                        onClick={() => setConfirmCancelId(booking.id)}
                         className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10"
                       >
                         <Trash2 className="w-4 h-4" />

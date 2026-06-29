@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Clock, CheckCircle, ArrowRight, ChevronLeft, CalendarCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 export default function BookingPage() {
   const navigate = useNavigate();
@@ -12,19 +14,30 @@ export default function BookingPage() {
 
   const [dynamicBookedSeats, setDynamicBookedSeats] = useState([]);
 
-  useEffect(() => {
-    if (formData.date && formData.slot) {
-      const history = JSON.parse(localStorage.getItem('booking_history') || '[]');
-      const booked = history
-        .filter(b => b.date === formData.date && b.slot === formData.slot)
-        .map(b => b.seat);
-      setDynamicBookedSeats(booked);
-    }
-  }, [formData]);
+  const { token, isAuthenticated } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Mock booked seats (hardcoded)
-  const baseMockSeats = [3, 7, 12, 18, 25];
-  const bookedSeats = [...new Set([...baseMockSeats, ...dynamicBookedSeats])];
+  const fetchOccupiedSeats = async () => {
+    if (formData.date && formData.slot && token) {
+      try {
+        const response = await axios.get('/api/bookings/occupied', {
+          params: { date: formData.date, slot: formData.slot },
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.data.success) {
+          setDynamicBookedSeats(response.data.occupied);
+        }
+      } catch (error) {
+        console.error("Failed to fetch occupied seats", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchOccupiedSeats();
+  }, [formData, token]);
+
+  const bookedSeats = [...new Set([...dynamicBookedSeats])];
 
   const sessions = [
     { id: 'Pagi', time: '08:00 - 12:00' },
@@ -41,31 +54,45 @@ export default function BookingPage() {
       toast.error('Silakan pilih sesi terlebih dahulu.');
       return;
     }
+    if (!isAuthenticated) {
+      toast.error('Silakan login terlebih dahulu untuk memesan kursi.');
+      navigate('/login');
+      return;
+    }
     setStep(2);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selectedSeat) {
       toast.error('Silakan pilih kursi terlebih dahulu.');
       return;
     }
 
-    const newBooking = {
-      date: formData.date,
-      slot: formData.slot,
-      seat: selectedSeat,
-      bookedAt: new Date().toISOString()
-    };
+    setIsSubmitting(true);
+    try {
+      const response = await axios.post('/api/bookings', 
+        { date: formData.date, slot: formData.slot, seat: selectedSeat },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-    const existingHistory = JSON.parse(localStorage.getItem('booking_history') || '[]');
-    localStorage.setItem('booking_history', JSON.stringify([...existingHistory, newBooking]));
-
-    toast.success('Kursi berhasil dipesan!');
-    
-    // Reset form
-    setStep(1);
-    setFormData({ date: '', slot: '' });
-    setSelectedSeat(null);
+      if (response.data.success) {
+        toast.success('Kursi berhasil dipesan!');
+        setStep(1);
+        setFormData({ date: '', slot: '' });
+        setSelectedSeat(null);
+      }
+    } catch (error) {
+      if (error.response?.status === 409) {
+        toast.error('Kursi sudah dipesan orang lain. Silakan pilih kursi lain.');
+        // Refresh occupied seats
+        fetchOccupiedSeats();
+        setSelectedSeat(null);
+      } else {
+        toast.error(error.response?.data?.message || 'Gagal memesan kursi.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -212,10 +239,11 @@ export default function BookingPage() {
                 </button>
                 <button
                   onClick={handleConfirm}
-                  className="flex items-center gap-2 bg-brand-orange hover:bg-brand-accent text-white px-6 py-2.5 rounded-xl font-bold transition-all hover:scale-105 shadow-neon"
+                  disabled={isSubmitting}
+                  className={`flex items-center gap-2 bg-brand-orange hover:bg-brand-accent text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-neon ${isSubmitting ? 'opacity-70 cursor-wait' : 'hover:scale-105'}`}
                 >
                   <CheckCircle className="h-5 w-5" />
-                  Konfirmasi Booking
+                  {isSubmitting ? 'Memproses...' : 'Konfirmasi Booking'}
                 </button>
               </div>
             </motion.div>

@@ -1,43 +1,134 @@
 import express from 'express';
 import cors from 'cors';
+import bcrypt from 'bcryptjs';
 import mangaRoutes from './routes/mangaRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+import bookingRoutes from './routes/bookingRoutes.js';
+import { authenticateToken } from './middleware/auth.js';
+import db, { initDB } from './db.js';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Register manga routes
-app.use('/api', mangaRoutes);
+// Initialize Database Schema
+initDB();
 
-// Mock Database in memory
-const users = [
-  { email: "dosen@kampus.ac.id", password: "password123", name: "Dosen Pembimbing" },
-  { email: "user@hybrid.com", password: "user123", name: "User Reguler" }
-];
+// Seed Demo User
+try {
+  const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get('dosen@amikom.ac.id');
+  if (!existingUser) {
+    const salt = bcrypt.genSaltSync(10);
+    const passwordHash = bcrypt.hashSync('password123', salt);
+    db.prepare('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)').run(
+      'Dosen Pembimbing', 'dosen@amikom.ac.id', passwordHash
+    );
+    console.log('✅ Demo user seeded: dosen@amikom.ac.id / password123');
+  }
+} catch (err) {
+  console.error('Error seeding demo user:', err);
+}
+
+// Public Routes
+app.use('/api', mangaRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/bookings', bookingRoutes);
 
 // Backend Health Check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running perfectly!', timestamp: new Date() });
 });
 
-// Login Endpoint
-app.post('/api/login', (req, res) => {
-  const { email, password } = req.body;
-  
-  if (!email || !password) {
-    return res.status(400).json({ success: false, message: 'Email and password are required' });
-  }
+// ----------------------------------------------------
+// Protected Routes
+// ----------------------------------------------------
 
-  const user = users.find(u => u.email === email && u.password === password);
-  
-  if (user) {
-    // Return success without password
-    const { password: _, ...userData } = user;
-    return res.json({ success: true, message: 'Login successful', user: userData, token: 'mock-jwt-token-12345' });
-  } else {
-    return res.status(401).json({ success: false, message: 'Invalid email or password' });
+// Profile Stats
+app.get('/api/profile/stats', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const favCount = db.prepare('SELECT COUNT(*) as count FROM favorites WHERE user_id = ?').get(userId).count;
+    const bookmarkCount = db.prepare('SELECT COUNT(*) as count FROM bookmarks WHERE user_id = ?').get(userId).count;
+    const bookingCount = db.prepare('SELECT COUNT(*) as count FROM bookings WHERE user_id = ?').get(userId).count;
+    
+    // For last reading progress, joining with manga is ideal, but here we just return the row
+    const lastProgress = db.prepare('SELECT * FROM reading_progress WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1').get(userId);
+
+    res.json({
+      success: true,
+      stats: {
+        favorites: favCount,
+        bookmarks: bookmarkCount,
+        bookings: bookingCount,
+        last_manga_read: lastProgress ? lastProgress.manga_id : null,
+        last_chapter: lastProgress ? lastProgress.chapter_id : null
+      }
+    });
+  } catch (error) {
+    console.error('Profile stats error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
+// Favorites CRUD
+app.get('/api/favorites', authenticateToken, (req, res) => {
+  try {
+    const favorites = db.prepare('SELECT manga_id FROM favorites WHERE user_id = ?').all(req.user.id);
+    res.json({ success: true, favorites: favorites.map(f => f.manga_id) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+app.post('/api/favorites', authenticateToken, (req, res) => {
+  try {
+    const { manga_id } = req.body;
+    db.prepare('INSERT OR IGNORE INTO favorites (user_id, manga_id) VALUES (?, ?)').run(req.user.id, manga_id);
+    res.json({ success: true, message: 'Added to favorites' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+app.delete('/api/favorites/:mangaId', authenticateToken, (req, res) => {
+  try {
+    db.prepare('DELETE FROM favorites WHERE user_id = ? AND manga_id = ?').run(req.user.id, req.params.mangaId);
+    res.json({ success: true, message: 'Removed from favorites' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Bookmarks CRUD (Similar structure)
+app.get('/api/bookmarks', authenticateToken, (req, res) => {
+  try {
+    const bookmarks = db.prepare('SELECT manga_id FROM bookmarks WHERE user_id = ?').all(req.user.id);
+    res.json({ success: true, bookmarks: bookmarks.map(b => b.manga_id) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+app.post('/api/bookmarks', authenticateToken, (req, res) => {
+  try {
+    const { manga_id } = req.body;
+    db.prepare('INSERT OR IGNORE INTO bookmarks (user_id, manga_id) VALUES (?, ?)').run(req.user.id, manga_id);
+    res.json({ success: true, message: 'Added to bookmarks' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+app.delete('/api/bookmarks/:mangaId', authenticateToken, (req, res) => {
+  try {
+    db.prepare('DELETE FROM bookmarks WHERE user_id = ? AND manga_id = ?').run(req.user.id, req.params.mangaId);
+    res.json({ success: true, message: 'Removed from bookmarks' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 
 // Start local server if not running in Vercel serverless environment
 if (!process.env.VERCEL) {

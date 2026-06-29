@@ -29,6 +29,7 @@ import SupernaturalGenrePage from './pages/SupernaturalGenrePage';
 import MysteryGenrePage from './pages/MysteryGenrePage';
 import PublisherPage from './components/PublisherPage';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import GalleryPage from './pages/GalleryPage';
 import BookingPage from './pages/BookingPage';
 import BookDetailPage from './pages/BookDetailPage';
@@ -44,6 +45,7 @@ export default function AppRouter({ catalogElement, favoritesElement, aboutEleme
       <Route path="/about" element={aboutElement} />
       <Route path="/gallery" element={<GalleryPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       <Route path="/booking" element={<BookingPage />} />
       <Route path="/book/:id" element={<BookDetailPage />} />
       <Route path="/read/:id" element={<ReadOnlyPage />} />
