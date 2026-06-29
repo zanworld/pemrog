@@ -7,7 +7,7 @@ import axios from 'axios';
 const router = express.Router();
 
 // Fallback UUID for mock chapters (so we can test real images without real manga UUIDs)
-const FALLBACK_CHAPTER_UUID = '250f091f-4166-4831-9f45-89ff54bf433b';
+const FALLBACK_CHAPTER_UUID = '0aaf8b27-0013-4ae0-8935-91a089466874';
 
 // GET /api/chapter/:chapterId/pages
 router.get('/chapter/:chapterId/pages', async (req, res) => {
