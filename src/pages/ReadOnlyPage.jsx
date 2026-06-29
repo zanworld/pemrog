@@ -14,7 +14,7 @@ export default function ReadOnlyPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const chapter = searchParams.get('chapter');
+  const chapter = searchParams.get('chapter') || '1';
 
   // Toast current chapter
   useEffect(() => {
