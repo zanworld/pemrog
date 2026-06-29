@@ -51,8 +51,69 @@ export default function App() {
     localStorage.setItem('hybrid_library_favorites', JSON.stringify(favorites));
   }, [favorites]);
 
-  // Fetch from local API
-  const fetchMangaData = async (filtersOverride = null) => {
+  // Load Fallback local data
+  const loadFallbackData = (activeFilters = filters) => {
+    let result = [...mockMangaData];
+    
+    if (activeFilters.query) {
+      const q = activeFilters.query.toLowerCase().trim();
+      result = result.filter(item => 
+        item.title.toLowerCase().includes(q) || 
+        (item.title_english && item.title_english.toLowerCase().includes(q))
+      );
+    }
+
+    if (activeFilters.genre) {
+      const genreMap = new Map([
+        ['1', 'Action'], ['2', 'Adventure'], ['4', 'Comedy'], ['8', 'Drama'],
+        ['10', 'Fantasy'], ['22', 'Romance'], ['24', 'Sci-Fi'], ['36', 'Slice of Life'], ['37', 'Supernatural'],
+        ['41', 'Suspense'], ['45', 'Award Winning'], ['46', 'Award Winning']
+      ]);
+      // fallback to genre ID lookup if map fails
+      const genreName = genreMap.get(activeFilters.genre);
+      if (genreName) {
+        result = result.filter(item => item.genres.some(g => g.name === genreName));
+      } else {
+        result = result.filter(item => item.genres.some(g => g.mal_id.toString() === activeFilters.genre.toString()));
+      }
+    }
+
+    if (activeFilters.status && activeFilters.status !== 'all') {
+      const statusMap = new Map([
+        ['publishing', 'Publishing'],
+        ['complete', 'Finished'],
+        ['upcoming', 'Not yet published']
+      ]);
+      const mappedStatus = statusMap.get(activeFilters.status);
+      if (mappedStatus) {
+        result = result.filter(item => item.status === mappedStatus);
+      }
+    }
+
+    if (activeFilters.sfw) {
+      const nsfwGenreIds = ['12', '49', '9', '28', '26', '43']; // Hentai, Erotica, Ecchi, Boys Love, Girls Love, Doujinshi
+      result = result.filter(item => {
+        return !item.genres.some(g => nsfwGenreIds.includes(g.mal_id.toString()));
+      });
+    }
+
+    if (activeFilters.sortBy === 'popularity') {
+      result.sort((a, b) => (a.popularity || 9999) - (b.popularity || 9999));
+    } else if (activeFilters.sortBy === 'score') {
+      result.sort((a, b) => (b.score || 0) - (a.score || 0));
+    } else if (activeFilters.sortBy === 'title') {
+      result.sort((a, b) => a.title.localeCompare(b.title));
+    }
+
+    const page = activeFilters.page || 1;
+    const limit = 24;
+    const startIndex = (page - 1) * limit;
+    
+    setMangaList(result.slice(startIndex, startIndex + limit));
+  };
+
+  // Fetch from Jikan API using Axios
+  const fetchMangaData = async (forceFallback = false, filtersOverride = null) => {
     setIsLoading(true);
     setError(null);
     const activeFilters = filtersOverride || filters;
@@ -64,7 +125,11 @@ export default function App() {
       if (activeFilters.query) queryParams.append('q', activeFilters.query);
       if (activeFilters.genre) queryParams.append('genres', activeFilters.genre);
       if (activeFilters.status && activeFilters.status !== 'all') queryParams.append('status', activeFilters.status);
-      if (activeFilters.sfw) queryParams.append('sfw', 'true');
+      if (activeFilters.sfw) {
+          queryParams.append('sfw', 'true');
+          // 12 = Hentai, 49 = Erotica, 9 = Ecchi, 28 = Boys Love, 26 = Girls Love, 43 = Doujinshi
+          queryParams.append('genres_exclude', '12,49,9,28,26,43');
+      }
 
       if (activeFilters.sortBy === 'popularity') {
         queryParams.append('order_by', 'popularity');
