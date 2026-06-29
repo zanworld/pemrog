@@ -50,11 +50,11 @@ export default function MangaDetailModal({ manga, onClose, isFavorite, onToggleF
               <div className="mt-4 flex flex-col gap-2">
                 {/* Read Manga Button */}
                 <button
-                  onClick={() => window.open(`https://mangadex.org/search?q=${encodeURIComponent(title)}`, '_blank')}
+                  onClick={() => window.open(`https://myanimelist.net/manga/${manga.mal_id}`, '_blank')}
                   className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all duration-200 bg-brand-orange hover:bg-brand-accent text-white shadow-neon hover:shadow-neon-hover group"
                 >
                   <BookOpen className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" />
-                  Read First Chapter
+                  View on MyAnimeList
                 </button>
 
                 {/* Favorites toggle inside modal */}

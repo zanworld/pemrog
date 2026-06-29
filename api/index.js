@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import mangaRoutes from './routes/mangaRoutes.js';
+import chapterRoutes from './routes/chapterRoutes.js';
+import imageProxy from './routes/imageProxy.js';
 import authRoutes from './routes/authRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
@@ -32,6 +34,8 @@ try {
 
 // Public Routes
 app.use('/api', mangaRoutes);
+app.use('/api', chapterRoutes); // GET /api/chapter/:chapterId/pages
+app.use('/api', imageProxy);    // GET /api/manga-image?url=...
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/reviews', reviewRoutes);
