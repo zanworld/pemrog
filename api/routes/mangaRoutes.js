@@ -1,5 +1,8 @@
 import express from 'express';
+import axios from 'axios';
 import { mockMangaData } from '../../src/mockMangaData.js';
+
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const router = express.Router();
 
@@ -83,14 +86,50 @@ router.get('/manga', (req, res) => {
   });
 });
 
-router.get('/manga/:id', (req, res) => {
-  const mangaId = parseInt(req.params.id, 10);
-  const manga = mockMangaData.find(m => m.mal_id === mangaId);
-  
-  if (manga) {
-    res.status(200).json({ data: manga });
-  } else {
-    res.status(404).json({ message: "Manga not found" });
+router.get('/manga/:id', async (req, res) => {
+  const { id } = req.params;
+
+  // If the id is strictly a number, try loading from mock data first
+  if (/^\d+$/.test(id)) {
+    const mockId = parseInt(id, 10);
+    const manga = mockMangaData.find(m => m.mal_id === mockId);
+    if (manga) {
+      return res.status(200).json({ data: manga });
+    }
+  }
+
+  try {
+    const response = await axios.get(`https://api.mangadex.org/manga/${id}`, {
+      params: {
+        'includes[]': ['author', 'cover_art']
+      }
+    });
+    res.json(response.data);
+  } catch (err) {
+    console.error(`Error fetching manga ${id} from MangaDex:`, err.message);
+    res.status(err.response?.status || 500).json({
+      message: err.response?.data?.message || 'Failed to fetch manga detail from MangaDex'
+    });
+  }
+});
+
+router.get('/manga/:id/feed', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const response = await axios.get(`https://api.mangadex.org/manga/${id}/feed`, {
+      params: {
+        'translatedLanguage[]': ['en'],
+        'order[chapter]': 'asc',
+        'limit': 100
+      }
+    });
+    res.json(response.data);
+  } catch (err) {
+    console.error(`Error fetching manga feed ${id} from MangaDex:`, err.message);
+    res.status(err.response?.status || 500).json({
+      message: err.response?.data?.message || 'Failed to fetch manga chapters feed from MangaDex'
+    });
   }
 });
 

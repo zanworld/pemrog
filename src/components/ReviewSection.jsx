@@ -1,47 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, User, MessageSquare, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
+import { getReviews, postReview } from '../services/mangadex';
 
 export default function ReviewSection({ mangaId }) {
+  const { isAuthenticated, user } = useAuth();
   const [reviews, setReviews] = useState([]);
-  const [name, setName] = useState('');
   const [comment, setComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load reviews from localStorage
-  useEffect(() => {
+  // Load reviews from backend
+  const fetchReviews = useCallback(async () => {
     if (!mangaId) return;
-    const allReviews = JSON.parse(localStorage.getItem('hybrid_library_reviews') || '{}');
-    const bookReviews = allReviews[mangaId] || [];
-    // Sort reviews by date descending (latest first)
-    setReviews(bookReviews.sort((a, b) => new Date(b.date) - new Date(a.date)));
+    try {
+      const res = await getReviews(mangaId);
+      if (res.success && res.reviews) {
+        setReviews(res.reviews);
+      }
+    } catch (error) {
+      console.error('Failed to load reviews from database:', error);
+    }
   }, [mangaId]);
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      fetchReviews();
+    });
+  }, [fetchReviews]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!isAuthenticated) {
+      toast.error('Silakan login terlebih dahulu untuk menulis ulasan!');
+      return;
+    }
 
     if (!comment.trim()) {
       toast.error('Komentar ulasan tidak boleh kosong!');
       return;
     }
 
-    const newReview = {
-      name: name.trim() || 'Anonim',
-      text: comment.trim(),
-      date: new Date().toISOString()
-    };
-
-    const allReviews = JSON.parse(localStorage.getItem('hybrid_library_reviews') || '{}');
-    const bookReviews = allReviews[mangaId] || [];
-    const updatedReviews = [newReview, ...bookReviews];
-
-    allReviews[mangaId] = updatedReviews;
-    localStorage.setItem('hybrid_library_reviews', JSON.stringify(allReviews));
-
-    setReviews(updatedReviews);
-    setName('');
-    setComment('');
-    toast.success('Ulasan berhasil ditambahkan!');
+    setIsSubmitting(true);
+    try {
+      const res = await postReview({ mangaId, comment: comment.trim() });
+      if (res.success) {
+        toast.success('Ulasan berhasil ditambahkan!');
+        setComment('');
+        fetchReviews(); // Refresh the list
+      }
+    } catch (error) {
+      console.error('Failed to save review:', error);
+      toast.error(error.response?.data?.message || 'Gagal mengirim ulasan.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getAvatarColor = (nameString) => {
@@ -66,7 +81,7 @@ export default function ReviewSection({ mangaId }) {
         hour: '2-digit',
         minute: '2-digit'
       });
-    } catch (e) {
+    } catch {
       return 'Baru saja';
     }
   };
@@ -83,7 +98,7 @@ export default function ReviewSection({ mangaId }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="name-input" className="block text-xs font-bold text-brand-textMuted uppercase mb-1.5">
-              Nama Lengkap (Opsional)
+              Nama Pengulas
             </label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-brand-textMuted/60">
@@ -92,10 +107,10 @@ export default function ReviewSection({ mangaId }) {
               <input
                 id="name-input"
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Nama Anda (Default: Anonim)"
-                className="w-full bg-brand-darkBg/60 border border-brand-border/70 rounded-xl py-2.5 pl-10 pr-4 text-sm text-brand-textMain placeholder-brand-textMuted/55 focus:outline-none focus:border-brand-orange/60 focus:ring-1 focus:ring-brand-orange/30 transition-all"
+                value={isAuthenticated ? user?.name || '' : ''}
+                disabled
+                placeholder="Silakan login terlebih dahulu"
+                className="w-full bg-brand-darkBg/30 border border-brand-border/40 rounded-xl py-2.5 pl-10 pr-4 text-sm text-brand-textMain/70 placeholder-brand-textMuted/55 focus:outline-none transition-all cursor-not-allowed"
               />
             </div>
           </div>
@@ -108,18 +123,20 @@ export default function ReviewSection({ mangaId }) {
               id="comment-input"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Tulis pendapat atau ulasan Anda tentang manga ini..."
+              disabled={!isAuthenticated}
+              placeholder={isAuthenticated ? "Tulis pendapat atau ulasan Anda tentang manga ini..." : "Silakan login terlebih dahulu untuk menulis ulasan"}
               rows="4"
-              className="w-full bg-brand-darkBg/60 border border-brand-border/70 rounded-xl py-2.5 px-4 text-sm text-brand-textMain placeholder-brand-textMuted/55 focus:outline-none focus:border-brand-orange/60 focus:ring-1 focus:ring-brand-orange/30 transition-all resize-none"
+              className={`w-full bg-brand-darkBg/60 border border-brand-border/70 rounded-xl py-2.5 px-4 text-sm text-brand-textMain placeholder-brand-textMuted/55 focus:outline-none focus:border-brand-orange/60 focus:ring-1 focus:ring-brand-orange/30 transition-all resize-none ${!isAuthenticated ? 'cursor-not-allowed opacity-50' : ''}`}
             />
           </div>
 
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold bg-brand-orange hover:bg-brand-accent text-white shadow-neon hover:shadow-neon-hover transition-all duration-200 group active:scale-98"
+            disabled={isSubmitting || !isAuthenticated}
+            className={`w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold bg-brand-orange hover:bg-brand-accent text-white shadow-neon hover:shadow-neon-hover transition-all duration-200 group active:scale-98 ${(!isAuthenticated || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <Send className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-            Kirim Ulasan
+            {isSubmitting ? 'Mengirim...' : 'Kirim Ulasan'}
           </button>
         </form>
       </div>
@@ -152,7 +169,7 @@ export default function ReviewSection({ mangaId }) {
 
                 return (
                   <motion.div
-                    key={`${review.date}-${index}`}
+                    key={review.id || `${review.date}-${index}`}
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -15 }}
@@ -167,8 +184,13 @@ export default function ReviewSection({ mangaId }) {
                     {/* Content */}
                     <div className="flex-1 space-y-1.5 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                        <span className="text-sm font-bold text-brand-textMain truncate">
+                        <span className="text-sm font-bold text-brand-textMain truncate flex items-center gap-2">
                           {review.name}
+                          {review.rating && (
+                            <span className="text-xs text-brand-orange font-bold px-1.5 py-0.5 rounded bg-brand-orange/10 border border-brand-orange/20">
+                              ★ {review.rating}
+                            </span>
+                          )}
                         </span>
                         <span className="text-[11px] text-brand-textMuted flex items-center gap-1">
                           <Calendar className="w-3.5 h-3.5" />

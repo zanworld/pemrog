@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import mangaRoutes from './routes/mangaRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
+import reviewRoutes from './routes/reviewRoutes.js';
 import { authenticateToken } from './middleware/auth.js';
 import db, { initDB } from './db.js';
 
@@ -33,6 +34,7 @@ try {
 app.use('/api', mangaRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 // Backend Health Check
 app.get('/api/health', (req, res) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
@@ -10,6 +10,8 @@ import {
 import toast from 'react-hot-toast';
 import RatingStars from '../components/RatingStars';
 import ReviewSection from '../components/ReviewSection';
+import { useAuth } from '../context/AuthContext';
+import { getMangaDetail, getMangaFeed, getReviews, postReview } from '../services/mangadex';
 
 // ── Animation Variants ──────────────────────────────────────
 const pageVariants = {
@@ -130,6 +132,7 @@ function MiniRecCard({ manga, index, navigate }) {
 export default function BookDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
 
   const [manga, setManga] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -139,18 +142,42 @@ export default function BookDetailPage() {
   const [recsLoading, setRecsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('Sinopsis');
   const [userRating, setUserRating] = useState(0);
+  const [chapters, setChapters] = useState([]);
+  const [chaptersLoading, setChaptersLoading] = useState(false);
 
   // ─── Check bookmark status on mount / id change ───
   useEffect(() => {
     const bookmarks = JSON.parse(localStorage.getItem('hybrid_library_bookmarks') || '[]');
-    setIsBookmarked(bookmarks.some(b => b.mal_id === parseInt(id)));
+    const isBookmarkedMatch = bookmarks.some(b => String(b.id || b.mal_id) === String(id));
+    Promise.resolve().then(() => {
+      setIsBookmarked(isBookmarkedMatch);
+    });
   }, [id]);
 
-  // ─── Check user rating on mount / id change ───
+  // ─── Fetch user rating from SQLite reviews database ───
   useEffect(() => {
-    const ratings = JSON.parse(localStorage.getItem('hybrid_library_ratings') || '{}');
-    setUserRating(ratings[id] || 0);
-  }, [id]);
+    const fetchUserRatingAndReviews = async () => {
+      try {
+        const res = await getReviews(id);
+        if (res.success && res.reviews) {
+          if (user) {
+            // Find rating from current user's review (if exists)
+            const ourReview = res.reviews.find(r => r.name === user.name && r.rating !== undefined);
+            if (ourReview) {
+              setUserRating(ourReview.rating);
+            } else {
+              setUserRating(0);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load rating from db:', err);
+      }
+    };
+    if (id) {
+      fetchUserRatingAndReviews();
+    }
+  }, [id, user]);
 
   // ─── Fetch manga detail ───
   useEffect(() => {
@@ -159,9 +186,9 @@ export default function BookDetailPage() {
       setError(null);
       setManga(null);
       try {
-        const res = await axios.get(`/api/manga/${id}`);
-        if (res.data?.data) {
-          setManga(res.data.data);
+        const res = await getMangaDetail(id);
+        if (res?.data) {
+          setManga(res.data);
         } else {
           throw new Error('Manga not found');
         }
@@ -176,17 +203,69 @@ export default function BookDetailPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [id]);
 
+  // ─── Fetch chapters feed ───
+  useEffect(() => {
+    const fetchChapters = async () => {
+      // If it is a mock numeric ID, just mock chapters
+      if (/^\d+$/.test(id)) {
+        const mockId = parseInt(id, 10);
+        const mockChs = Array.from({ length: 20 }, (_, i) => ({
+          id: `${mockId}?chapter=${i + 1}`,
+          chapterNumber: String(i + 1),
+          title: `Chapter ${i + 1}`
+        }));
+        setChapters(mockChs);
+        return;
+      }
+
+      setChaptersLoading(true);
+      try {
+        const res = await getMangaFeed(id);
+        if (res?.data) {
+          const mapped = res.data.map(ch => ({
+            id: ch.id,
+            chapterNumber: ch.attributes?.chapter || '?',
+            title: ch.attributes?.title || `Chapter ${ch.attributes?.chapter || '?'}`
+          }));
+          setChapters(mapped);
+        }
+      } catch (err) {
+        console.error('Failed to fetch chapters:', err);
+      } finally {
+        setChaptersLoading(false);
+      }
+    };
+    if (id) {
+      fetchChapters();
+    }
+  }, [id]);
+
   // ─── Fetch "You May Also Like" recommendations ───
   useEffect(() => {
-    if (!manga?.genres?.length) return;
+    if (!manga) return;
 
     const fetchRecs = async () => {
       setRecsLoading(true);
       try {
-        const firstGenreId = manga.genres[0].mal_id;
-        const res = await axios.get(`/api/manga?genres=${firstGenreId}&limit=12`);
+        let firstGenreId;
+        const isMock = manga && /^\d+$/.test(String(manga.mal_id || manga.id));
+        
+        if (isMock) {
+          firstGenreId = manga.genres?.[0]?.mal_id;
+        } else {
+          const tags = manga.attributes?.tags || [];
+          const genreTag = tags.find(tag => tag.attributes?.group === 'genre');
+          firstGenreId = genreTag?.id;
+        }
+
+        // If firstGenreId is not a number, it's a MangaDex UUID.
+        // Since mock database uses numeric genre IDs, fallback to general mock list if firstGenreId is UUID
+        const isNumeric = firstGenreId !== undefined && !isNaN(parseInt(firstGenreId, 10)) && isFinite(firstGenreId);
+        const queryParam = isNumeric ? `genres=${firstGenreId}&` : '';
+        const res = await axios.get(`/api/manga?${queryParam}limit=12`);
         if (res.data?.data) {
-          const filtered = res.data.data.filter(m => m.mal_id !== manga.mal_id);
+          const currentIdStr = String(manga.id || manga.mal_id);
+          const filtered = res.data.data.filter(m => String(m.mal_id) !== currentIdStr);
           setRecommendations(filtered.slice(0, 6));
         }
       } catch (err) {
@@ -202,14 +281,32 @@ export default function BookDetailPage() {
   const handleBookmark = () => {
     if (!manga) return;
     const bookmarks = JSON.parse(localStorage.getItem('hybrid_library_bookmarks') || '[]');
+    const currentIdStr = String(manga.id || manga.mal_id);
+    const isAlreadyBookmarked = bookmarks.some(b => String(b.id || b.mal_id) === currentIdStr);
 
-    if (isBookmarked) {
-      const updated = bookmarks.filter(b => b.mal_id !== manga.mal_id);
+    if (isAlreadyBookmarked) {
+      const updated = bookmarks.filter(b => String(b.id || b.mal_id) !== currentIdStr);
       localStorage.setItem('hybrid_library_bookmarks', JSON.stringify(updated));
       setIsBookmarked(false);
       toast('Bookmark removed', { icon: '🗑️' });
     } else {
-      bookmarks.push(manga);
+      // Store a simple normalized object in bookmarks so bookmarks page doesn't crash on layout fields
+      const bookData = {
+        id: manga.id || manga.mal_id,
+        mal_id: manga.id || manga.mal_id,
+        title: manga.title || manga.title_english || manga.attributes?.title?.en || Object.values(manga.attributes?.title || {})[0] || 'Unknown Title',
+        images: manga.images || {
+          jpg: {
+            large_image_url: (() => {
+              const coverRel = manga.relationships?.find(r => r.type === 'cover_art');
+              const fileName = coverRel?.attributes?.fileName;
+              return fileName ? `https://uploads.mangadex.org/covers/${manga.id}/${fileName}` : '';
+            })()
+          }
+        },
+        score: manga.score || 0
+      };
+      bookmarks.push(bookData);
       localStorage.setItem('hybrid_library_bookmarks', JSON.stringify(bookmarks));
       setIsBookmarked(true);
       toast.success('Bookmarked successfully!');
@@ -217,12 +314,19 @@ export default function BookDetailPage() {
   };
 
   // ─── User rating handler ───
-  const handleRatingChange = (newRating) => {
+  const handleRatingChange = async (newRating) => {
+    if (!isAuthenticated) {
+      toast.error('Silakan login terlebih dahulu untuk memberikan rating!');
+      return;
+    }
     setUserRating(newRating);
-    const ratings = JSON.parse(localStorage.getItem('hybrid_library_ratings') || '{}');
-    ratings[id] = newRating;
-    localStorage.setItem('hybrid_library_ratings', JSON.stringify(ratings));
-    toast.success(`Terima kasih! Anda memberi rating ${newRating} bintang.`);
+    try {
+      await postReview({ mangaId: id, rating: newRating });
+      toast.success(`Terima kasih! Anda memberi rating ${newRating} bintang.`);
+    } catch (err) {
+      console.error('Failed to save rating:', err);
+      toast.error('Gagal menyimpan rating ke database.');
+    }
   };
 
   // ─── Share link handler ───
@@ -276,20 +380,55 @@ export default function BookDetailPage() {
   if (!manga) return null;
 
   // ─── Extract data ───
-  const title = manga.title || manga.title_english || 'Unknown Title';
-  const titleJp = manga.title_japanese || '';
-  const imageUrl = manga.images?.jpg?.large_image_url || manga.images?.jpg?.image_url || '';
-  const score = manga.score ? manga.score.toFixed(1) : 'N/A';
-  const rank = manga.rank || 'N/A';
-  const popularity = manga.popularity || 'N/A';
-  const chapters = manga.chapters || 'Unknown';
-  const volumes = manga.volumes || 'Unknown';
-  const status = manga.status || 'Unknown';
-  const synopsis = manga.synopsis || 'No description available for this manga.';
-  const publishedStr = manga.published?.string || 'Unknown';
-  const genres = manga.genres || [];
-  const authors = manga.authors || [];
-  const type = manga.type || 'Manga';
+  const isMock = manga && /^\d+$/.test(String(manga.mal_id || manga.id));
+
+  const title = isMock 
+    ? (manga.title || manga.title_english || 'Unknown Title')
+    : (manga.attributes?.title?.en || Object.values(manga.attributes?.title || {})[0] || 'Unknown Title');
+
+  const titleJp = isMock
+    ? (manga.title_japanese || '')
+    : (manga.attributes?.title?.ja || manga.attributes?.title?.['ja-ro'] || '');
+
+  const imageUrl = isMock
+    ? (manga.images?.jpg?.large_image_url || manga.images?.jpg?.image_url || '')
+    : (() => {
+        const coverRel = manga.relationships?.find(r => r.type === 'cover_art');
+        const fileName = coverRel?.attributes?.fileName;
+        return fileName 
+          ? `https://uploads.mangadex.org/covers/${manga.id}/${fileName}`
+          : 'https://via.placeholder.com/256x364?text=No+Cover';
+      })();
+
+  const score = isMock ? (manga.score ? manga.score.toFixed(1) : 'N/A') : 'N/A';
+  const rank = isMock ? (manga.rank || 'N/A') : 'N/A';
+  const popularity = isMock ? (manga.popularity || 'N/A') : 'N/A';
+  const chaptersCount = isMock ? (manga.chapters || 'Unknown') : (manga.attributes?.lastChapter || 'Unknown');
+  const volumes = isMock ? (manga.volumes || 'Unknown') : (manga.attributes?.lastVolume || 'Unknown');
+  const status = isMock ? (manga.status || 'Unknown') : (manga.attributes?.status || 'Unknown');
+  const synopsis = isMock 
+    ? (manga.synopsis || 'No description available for this manga.')
+    : (manga.attributes?.description?.en || Object.values(manga.attributes?.description || {})[0] || 'No description available.');
+  const publishedStr = isMock ? (manga.published?.string || 'Unknown') : (manga.attributes?.year ? String(manga.attributes.year) : 'Unknown');
+
+  const genres = isMock 
+    ? (manga.genres || [])
+    : (manga.attributes?.tags || [])
+        .filter(tag => tag.attributes?.group === 'genre')
+        .map(tag => ({
+          mal_id: tag.id,
+          name: tag.attributes?.name?.en || Object.values(tag.attributes?.name || {})[0] || 'Genre'
+        }));
+
+  const authors = isMock
+    ? (manga.authors || [])
+    : (manga.relationships || [])
+        .filter(r => r.type === 'author')
+        .map(r => ({
+          name: r.attributes?.name || 'Unknown Author'
+        }));
+
+  const type = isMock ? (manga.type || 'Manga') : 'Manga';
 
   return (
     <AnimatePresence mode="wait">
@@ -366,7 +505,7 @@ export default function BookDetailPage() {
             <div className="mt-5 flex flex-col gap-2.5">
               {/* Read Online */}
               <button
-                onClick={() => navigate(`/read/${manga.mal_id}`)}
+                onClick={() => navigate(`/read/${manga.id || manga.mal_id}`)}
                 className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold bg-brand-orange hover:bg-brand-accent text-white shadow-neon hover:shadow-neon-hover transition-all duration-200 group"
               >
                 <BookOpen className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" />
@@ -454,7 +593,7 @@ export default function BookDetailPage() {
               <div className="flex items-center gap-2.5 text-sm text-brand-textMuted">
                 <BookOpenCheck className="h-4 w-4 text-brand-orange flex-shrink-0" />
                 <span>
-                  <strong className="text-brand-textMain">Chapters:</strong> {chapters}
+                  <strong className="text-brand-textMain">Chapters:</strong> {chaptersCount}
                 </span>
               </div>
               <div className="flex items-center gap-2.5 text-sm text-brand-textMuted">
@@ -543,26 +682,32 @@ export default function BookDetailPage() {
                   )}
 
                   {activeTab === 'Daftar Chapter' && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                      {Array.from({ length: 20 }, (_, i) => i + 1).map((ch) => (
-                        <button
-                          key={ch}
-                          onClick={() => navigate(`/read/${manga.mal_id}?chapter=${ch}`)}
-                          className="flex flex-col items-start p-3 bg-brand-cardBg/65 border border-brand-border/45 hover:border-brand-orange/50 hover:bg-brand-orange/5 hover:shadow-sm rounded-xl transition-all text-left group cursor-pointer"
-                        >
-                          <span className="text-xs font-bold text-brand-textMain group-hover:text-brand-orange transition-colors">
-                            Chapter {ch}
-                          </span>
-                          <span className="text-[10px] text-brand-textMuted mt-0.5">
-                            Klik untuk membaca
-                          </span>
-                        </button>
-                      ))}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 w-full">
+                      {chapters.length > 0 ? (
+                        chapters.map((ch) => (
+                          <button
+                            key={ch.id}
+                            onClick={() => navigate(`/read/${ch.id}`)}
+                            className="flex flex-col items-start p-3 bg-brand-cardBg/65 border border-brand-border/45 hover:border-brand-orange/50 hover:bg-brand-orange/5 hover:shadow-sm rounded-xl transition-all text-left group cursor-pointer w-full overflow-hidden"
+                          >
+                            <span className="text-xs font-bold text-brand-textMain group-hover:text-brand-orange transition-colors">
+                              Chapter {ch.chapterNumber}
+                            </span>
+                            <span className="text-[10px] text-brand-textMuted mt-0.5 truncate max-w-full">
+                              {ch.title || 'Klik untuk membaca'}
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="text-xs text-brand-textMuted col-span-full text-center py-8">
+                          {chaptersLoading ? 'Memuat daftar chapter...' : 'Daftar chapter tidak tersedia.'}
+                        </p>
+                      )}
                     </div>
                   )}
 
                   {activeTab === 'Ulasan' && (
-                    <ReviewSection mangaId={manga.mal_id} />
+                    <ReviewSection mangaId={manga.id || manga.mal_id} />
                   )}
                 </motion.div>
               </AnimatePresence>
