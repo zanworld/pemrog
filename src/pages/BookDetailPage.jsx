@@ -247,21 +247,19 @@ export default function BookDetailPage() {
     const fetchRecs = async () => {
       setRecsLoading(true);
       try {
-        let firstGenreId;
-        const isMock = manga && /^\d+$/.test(String(manga.mal_id || manga.id));
-        
-        if (isMock) {
-          firstGenreId = manga.genres?.[0]?.mal_id;
-        } else {
-          const tags = manga.attributes?.tags || [];
-          const genreTag = tags.find(tag => tag.attributes?.group === 'genre');
-          firstGenreId = genreTag?.id;
-        }
+        const firstGenreId = manga.genres?.[0]?.mal_id;
 
         // If firstGenreId is not a number, it's a MangaDex UUID.
-        // Since mock database uses numeric genre IDs, fallback to general mock list if firstGenreId is UUID
+        // If it's a UUID, we pass includedTags[]=UUID to the gallery proxy
+        // If it's numeric, we pass genres=ID to the mock data legacy param
         const isNumeric = firstGenreId !== undefined && !isNaN(parseInt(firstGenreId, 10)) && isFinite(firstGenreId);
-        const queryParam = isNumeric ? `genres=${firstGenreId}&` : '';
+        
+        let queryParam = '';
+        if (firstGenreId) {
+            queryParam = isNumeric 
+              ? `genres=${firstGenreId}&` 
+              : `includedTags[]=${firstGenreId}&offset=0&`; // force offset=0 for mangadex proxy
+        }
         const res = await axios.get(`/api/manga?${queryParam}limit=12`);
         if (res.data?.data) {
           const currentIdStr = String(manga.id || manga.mal_id);
@@ -380,55 +378,23 @@ export default function BookDetailPage() {
   if (!manga) return null;
 
   // ─── Extract data ───
-  const isMock = manga && /^\d+$/.test(String(manga.mal_id || manga.id));
+  // Backend proxy already normalizes MangaDex UUID data into this exact shape
+  const title = manga.title || manga.title_english || 'Unknown Title';
+  const titleJp = manga.title_japanese || '';
+  const imageUrl = manga.images?.jpg?.large_image_url || manga.images?.jpg?.image_url || 'https://via.placeholder.com/256x364?text=No+Cover';
 
-  const title = isMock 
-    ? (manga.title || manga.title_english || 'Unknown Title')
-    : (manga.attributes?.title?.en || Object.values(manga.attributes?.title || {})[0] || 'Unknown Title');
+  const score = manga.score ? manga.score.toFixed(1) : 'N/A';
+  const rank = manga.rank || 'N/A';
+  const popularity = manga.popularity || 'N/A';
+  const chaptersCount = manga.chapters || 'Unknown';
+  const volumes = manga.volumes || 'Unknown';
+  const status = manga.status || 'Unknown';
+  const synopsis = manga.synopsis || 'No description available for this manga.';
+  const publishedStr = manga.published?.string || 'Unknown';
 
-  const titleJp = isMock
-    ? (manga.title_japanese || '')
-    : (manga.attributes?.title?.ja || manga.attributes?.title?.['ja-ro'] || '');
-
-  const imageUrl = isMock
-    ? (manga.images?.jpg?.large_image_url || manga.images?.jpg?.image_url || '')
-    : (() => {
-        const coverRel = manga.relationships?.find(r => r.type === 'cover_art');
-        const fileName = coverRel?.attributes?.fileName;
-        return fileName 
-          ? `https://uploads.mangadex.org/covers/${manga.id}/${fileName}`
-          : 'https://via.placeholder.com/256x364?text=No+Cover';
-      })();
-
-  const score = isMock ? (manga.score ? manga.score.toFixed(1) : 'N/A') : 'N/A';
-  const rank = isMock ? (manga.rank || 'N/A') : 'N/A';
-  const popularity = isMock ? (manga.popularity || 'N/A') : 'N/A';
-  const chaptersCount = isMock ? (manga.chapters || 'Unknown') : (manga.attributes?.lastChapter || 'Unknown');
-  const volumes = isMock ? (manga.volumes || 'Unknown') : (manga.attributes?.lastVolume || 'Unknown');
-  const status = isMock ? (manga.status || 'Unknown') : (manga.attributes?.status || 'Unknown');
-  const synopsis = isMock 
-    ? (manga.synopsis || 'No description available for this manga.')
-    : (manga.attributes?.description?.en || Object.values(manga.attributes?.description || {})[0] || 'No description available.');
-  const publishedStr = isMock ? (manga.published?.string || 'Unknown') : (manga.attributes?.year ? String(manga.attributes.year) : 'Unknown');
-
-  const genres = isMock 
-    ? (manga.genres || [])
-    : (manga.attributes?.tags || [])
-        .filter(tag => tag.attributes?.group === 'genre')
-        .map(tag => ({
-          mal_id: tag.id,
-          name: tag.attributes?.name?.en || Object.values(tag.attributes?.name || {})[0] || 'Genre'
-        }));
-
-  const authors = isMock
-    ? (manga.authors || [])
-    : (manga.relationships || [])
-        .filter(r => r.type === 'author')
-        .map(r => ({
-          name: r.attributes?.name || 'Unknown Author'
-        }));
-
-  const type = isMock ? (manga.type || 'Manga') : 'Manga';
+  const genres = manga.genres || [];
+  const authors = manga.authors || [];
+  const type = manga.type || 'Manga';
 
   return (
     <AnimatePresence mode="wait">
