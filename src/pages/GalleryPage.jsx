@@ -117,7 +117,7 @@ export default function GalleryPage() {
       const newOffset = currentOffset + items.length;
       setOffset(newOffset);
       setTotal(mdTotal);
-      setHasMore(items.length === BATCH_SIZE && newOffset < mdTotal);
+      setHasMore(items.length > 0 && newOffset < mdTotal);
     } catch (err) {
       console.error('Error fetching manga from MangaDex:', err);
       if (currentOffset === 0 || isReset) {
