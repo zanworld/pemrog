@@ -7,6 +7,7 @@ import imageProxy from './routes/imageProxy.js';
 import authRoutes from './routes/authRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
+import progressRoutes from './routes/progressRoutes.js';
 import { authenticateToken } from './middleware/auth.js';
 import db, { initDB } from './db.js';
 
@@ -39,6 +40,7 @@ app.use('/api', imageProxy);    // GET /api/manga-image?url=...
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api', progressRoutes);
 
 // Backend Health Check
 app.get('/api/health', (req, res) => {
