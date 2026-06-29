@@ -11,28 +11,20 @@ import Lightbox from '../components/Lightbox';
 
 const BATCH_SIZE = 16;
 
-// ── MangaDex helpers ─────────────────────────────────────────────
+// ── Jikan API helpers ─────────────────────────────────────────────
 function getCoverUrl(manga) {
-  const rel = (manga.relationships || []).find((r) => r.type === 'cover_art');
-  const fn = rel?.attributes?.fileName;
-  return fn
-    ? `https://uploads.mangadex.org/covers/${manga.id}/${fn}.512.jpg`
-    : null;
+  return manga.images?.jpg?.large_image_url || manga.images?.jpg?.image_url || null;
 }
 
 function getTitle(manga) {
-  const t = manga.attributes?.title || {};
-  return t.en || t['ja-ro'] || Object.values(t)[0] || 'Unknown';
+  return manga.title_english || manga.title || 'Unknown';
 }
 
 function getGenres(manga) {
-  return (manga.attributes?.tags || [])
-    .filter((t) => t.attributes?.group === 'genre')
-    .slice(0, 2)
-    .map((t) => ({
-      id: t.id,
-      name: t.attributes?.name?.en || Object.values(t.attributes?.name || {})[0] || '',
-    }));
+  return (manga.genres || []).slice(0, 2).map(g => ({
+    id: g.mal_id,
+    name: g.name,
+  }));
 }
 
 // ── Component ────────────────────────────────────────────────────
@@ -41,7 +33,7 @@ export default function GalleryPage() {
 
   // ── Data states ──
   const [mangas, setMangas] = useState([]);
-  const [offset, setOffset] = useState(0);
+  const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,14 +65,13 @@ export default function GalleryPage() {
 
   // ── Fetch tags on mount ──────────────────────────────────────
   useEffect(() => {
-    axios.get('/api/manga/tag')
+    axios.get('/api/manga/genres')
       .then(({ data }) => {
         if (data?.data) {
           const genreTags = data.data
-            .filter((t) => t.attributes?.group === 'genre')
             .map((t) => ({
-              id: t.id,
-              name: t.attributes?.name?.en || Object.values(t.attributes?.name || {})[0] || '',
+              id: t.mal_id,
+              name: t.name,
             }))
             .sort((a, b) => a.name.localeCompare(b.name));
           setTags(genreTags);
@@ -90,8 +81,8 @@ export default function GalleryPage() {
   }, []);
 
   // ── Core fetch function ──────────────────────────────────────
-  const fetchBatch = useCallback(async (currentOffset, isReset = false) => {
-    if (currentOffset === 0 || isReset) {
+  const fetchBatch = useCallback(async (currentPage, isReset = false) => {
+    if (currentPage === 1 || isReset) {
       setIsLoading(true);
       setError(null);
     } else {
@@ -103,24 +94,35 @@ export default function GalleryPage() {
     try {
       const params = new URLSearchParams();
       params.append('limit', BATCH_SIZE);
-      params.append('offset', currentOffset);
-      params.append('sortBy', sb);
-      if (q.trim()) params.append('title', q.trim());
-      if (tag) params.append('includedTags[]', tag);
+      params.append('page', currentPage);
+      
+      if (sb === 'popularity') {
+        params.append('order_by', 'popularity');
+        params.append('sort', 'asc');
+      } else if (sb === 'title') {
+        params.append('order_by', 'title');
+        params.append('sort', 'asc');
+      } else if (sb === 'newest') {
+        params.append('order_by', 'start_date');
+        params.append('sort', 'desc');
+      }
+
+      if (q.trim()) params.append('q', q.trim());
+      if (tag) params.append('genres', tag);
 
       const { data } = await axios.get(`/api/manga?${params.toString()}`);
 
       const items = data?.data || [];
-      const mdTotal = data?.total ?? 9999;
+      const pagination = data?.pagination || {};
+      const totalItems = pagination.items?.total || 0;
 
-      setMangas((prev) => (isReset || currentOffset === 0 ? items : [...prev, ...items]));
-      const newOffset = currentOffset + items.length;
-      setOffset(newOffset);
-      setTotal(mdTotal);
-      setHasMore(items.length > 0 && newOffset < mdTotal);
+      setMangas((prev) => (isReset || currentPage === 1 ? items : [...prev, ...items]));
+      setPage(currentPage);
+      setTotal(totalItems);
+      setHasMore(pagination.has_next_page);
     } catch (err) {
-      console.error('Error fetching manga from MangaDex:', err);
-      if (currentOffset === 0 || isReset) {
+      console.error('Error fetching manga from Jikan API:', err);
+      if (currentPage === 1 || isReset) {
         setError('Gagal memuat galeri manga. Periksa koneksi internet dan coba lagi.');
       }
     } finally {
@@ -131,7 +133,7 @@ export default function GalleryPage() {
 
   // ── Initial fetch ────────────────────────────────────────────
   useEffect(() => {
-    fetchBatch(0, true);
+    fetchBatch(1, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -140,9 +142,9 @@ export default function GalleryPage() {
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
     setMangas([]);
-    setOffset(0);
+    setPage(1);
     setHasMore(true);
-    fetchBatch(0, true);
+    fetchBatch(1, true);
   }, [debouncedQuery, selectedTag, sortBy, fetchBatch]);
 
   // ── Debounce search ──────────────────────────────────────────
@@ -169,9 +171,9 @@ export default function GalleryPage() {
       setIsFetching(false);
       return;
     }
-    fetchBatch(offset);
+    fetchBatch(page + 1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFetchingMore, hasMore, offset, fetchBatch]);
+  }, [isFetchingMore, hasMore, page, fetchBatch]);
 
   const [observerRef, isFetching, setIsFetching] = useInfiniteScroll(loadMore);
 
@@ -216,7 +218,7 @@ export default function GalleryPage() {
               </h1>
               <p className="text-sm text-brand-textMuted mt-1 flex items-center gap-1.5">
                 <Tag className="h-3.5 w-3.5 text-brand-orange" />
-                Data langsung dari MangaDex
+                Data dari MyAnimeList (Jikan API)
               </p>
             </div>
           </div>
@@ -350,7 +352,7 @@ export default function GalleryPage() {
           <p className="text-sm text-brand-textMuted mb-6 max-w-xs">{error}</p>
           <button
             id="gallery-retry"
-            onClick={() => fetchBatch(0, true)}
+            onClick={() => fetchBatch(1, true)}
             className="flex items-center gap-2 px-5 py-2.5 bg-brand-orange hover:bg-brand-accent text-white font-bold rounded-xl shadow-neon transition-all duration-200 text-sm"
           >
             <RefreshCw className="h-4 w-4" /> Coba Lagi
@@ -383,7 +385,7 @@ export default function GalleryPage() {
             : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'}>
             <AnimatePresence>
               {mangas.map((manga) => {
-                const id = manga.id;
+                const id = manga.mal_id || manga.id;
                 const title = getTitle(manga);
                 const coverUrl = getCoverUrl(manga);
                 const genres = getGenres(manga);
