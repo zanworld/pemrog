@@ -1,85 +1,67 @@
-// ============================================================
-// Route manga — mengambil data dari Jikan API.
-// ============================================================
 import express from 'express';
-import {
-  searchManga,
-  getMangaById,
-  getGenres,
-} from '../services/jikan.js';
+import * as dataSource from '../services/dataSource.js';
 
 const router = express.Router();
 
-// GET /api/manga  — pencarian / daftar (search, filter, sort, pagination)
+// GET /api/manga
 router.get('/manga', async (req, res) => {
+  const { q, genres, status, sfw, order_by = 'popularity', sort = 'asc', page = 1, limit = 12 } = req.query;
+  
   try {
-    const {
-      q, genres, status, sfw,
-      order_by = 'popularity', sort = 'desc',
-      page = 1, limit = 12,
-    } = req.query;
-
-    const parsedLimit = Math.min(parseInt(limit, 10) || 12, 24);
-    const parsedPage = parseInt(page, 10) || 1;
-
-    const params = {
-      page: parsedPage,
-      limit: parsedLimit,
-    };
-    
-    if (q) params.q = q;
-    if (genres) params.genres = genres;
-    if (status && status !== 'all') params.status = status.toLowerCase();
-    
-    // Explicitly filter out NSFW/Erotic content if sfw mode is active
-    if (sfw === 'true') {
-      params.sfw = true;
-      // 12 = Hentai, 49 = Erotica, 9 = Ecchi, 28 = Boys Love, 26 = Girls Love, 43 = Doujinshi
-      params.genres_exclude = '12,49,9,28,26,43';
-    }
-    
-    // Jikan supports sort by title, start_date, end_date, chapters, volumes, score, scored_by, rank, popularity, members, favorites
-    if (order_by) params.order_by = order_by;
-    if (sort) params.sort = sort;
-
-    const result = await searchManga(params);
-    
-    // result dari Jikan API sudah sesuai format: { data: [...], pagination: {...} }
+    const result = await dataSource.searchManga(
+      q,
+      parseInt(limit, 10) || 12,
+      parseInt(page, 10) || 1,
+      genres,
+      status,
+      order_by,
+      sort,
+      sfw === 'true'
+    );
     res.json(result);
   } catch (err) {
-    console.error('GET /manga error:', err.response?.data || err.message);
-    res.status(502).json({ message: 'Gagal mengambil data dari Jikan API' });
+    console.error('Error in searchManga route:', err.message);
+    res.status(500).json({ error: 'Failed to search manga' });
   }
 });
 
-// GET /api/manga/genres — daftar genre untuk filter
+// GET /api/manga/genres
 router.get('/manga/genres', async (req, res) => {
   try {
-    const result = await getGenres();
-    res.json(result); // Jikan returns { data: [...] }
+    const genres = await dataSource.getGenres();
+    res.json({ data: genres });
   } catch (err) {
-    console.error('GET /manga/genres error:', err.message);
-    res.status(502).json({ message: 'Gagal mengambil daftar genre' });
+    console.error('Error in getGenres route:', err.message);
+    res.status(500).json({ error: 'Failed to fetch genres' });
   }
 });
 
-// GET /api/manga/:id/feed — dummy endpoint karena Jikan tidak menyediakan chapter
-router.get('/manga/:id/feed', async (req, res) => {
-  res.json({ data: [] });
-});
-
-// GET /api/manga/:id — detail satu judul
+// GET /api/manga/:id
 router.get('/manga/:id', async (req, res) => {
+  const { id } = req.params;
+  
   try {
-    const result = await getMangaById(req.params.id);
-    if (!result.data) return res.status(404).json({ message: 'Manga not found' });
-    res.json(result); // Jikan returns { data: {...} }
-  } catch (err) {
-    if (err.response?.status === 404) {
+    const manga = await dataSource.getMangaById(id);
+    if (!manga) {
       return res.status(404).json({ message: 'Manga not found' });
     }
-    console.error('GET /manga/:id error:', err.message);
-    res.status(502).json({ message: 'Gagal mengambil detail manga' });
+    res.json({ data: manga });
+  } catch (err) {
+    console.error(`Error in getMangaById route for ID ${id}:`, err.message);
+    res.status(500).json({ message: err.message || 'Failed to fetch manga detail' });
+  }
+});
+
+// GET /api/manga/:id/feed
+router.get('/manga/:id/feed', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const feed = await dataSource.getMangaFeed(id);
+    res.json(feed);
+  } catch (err) {
+    console.error(`Error in getMangaFeed route for ID ${id}:`, err.message);
+    res.status(500).json({ message: 'Failed to fetch chapters feed' });
   }
 });
 

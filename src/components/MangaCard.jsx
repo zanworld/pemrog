@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, Heart, Bookmark } from 'lucide-react';
+import DataSourceBadge from './DataSourceBadge';
 
 export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClickCard }) {
   const navigate = useNavigate();
@@ -46,6 +47,11 @@ export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClick
         {/* Format Badge (Manga, Manhwa, etc) */}
         <div className="absolute right-3 top-3 rounded-lg bg-black/80 px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase text-brand-textMain border border-white/10">
           {type}
+        </div>
+
+        {/* Source Badge */}
+        <div className="absolute left-3 bottom-3">
+          <DataSourceBadge source={manga.source} />
         </div>
 
         {/* Favorite Button */}

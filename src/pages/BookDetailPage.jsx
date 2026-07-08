@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
@@ -10,6 +10,7 @@ import {
 import toast from 'react-hot-toast';
 import RatingStars from '../components/RatingStars';
 import ReviewSection from '../components/ReviewSection';
+import DataSourceBadge from '../components/DataSourceBadge';
 import { useAuth } from '../context/AuthContext';
 import { getMangaDetail, getMangaFeed, getReviews, postReview } from '../services/mangadex';
 
@@ -97,7 +98,7 @@ function MiniRecCard({ manga, index, navigate }) {
       variants={recCardVariants}
       initial="hidden"
       animate="visible"
-      onClick={() => navigate(`/book/${manga.mal_id}`)}
+      onClick={() => navigate(`/book/${manga.id || manga.mal_id}`)}
       className="group flex-shrink-0 w-36 sm:w-40 cursor-pointer"
     >
       <div className="relative aspect-[3/4.2] w-full overflow-hidden rounded-xl bg-brand-darkBg border border-brand-border/60 transition-all duration-300 group-hover:border-brand-orange/50 group-hover:shadow-neon">
@@ -149,9 +150,7 @@ export default function BookDetailPage() {
   useEffect(() => {
     const bookmarks = JSON.parse(localStorage.getItem('hybrid_library_bookmarks') || '[]');
     const isBookmarkedMatch = bookmarks.some(b => String(b.id || b.mal_id) === String(id));
-    Promise.resolve().then(() => {
-      setIsBookmarked(isBookmarkedMatch);
-    });
+    setIsBookmarked(isBookmarkedMatch);
   }, [id]);
 
   // ─── Fetch user rating from SQLite reviews database ───
@@ -180,44 +179,33 @@ export default function BookDetailPage() {
   }, [id, user]);
 
   // ─── Fetch manga detail ───
-  useEffect(() => {
-    const fetchManga = async () => {
-      setIsLoading(true);
-      setError(null);
-      setManga(null);
-      try {
-        const res = await getMangaDetail(id);
-        if (res?.data) {
-          setManga(res.data);
-        } else {
-          throw new Error('Manga not found');
-        }
-      } catch (err) {
-        console.error('Failed to fetch manga detail:', err);
-        setError(err.response?.data?.message || 'Failed to load manga details.');
-      } finally {
-        setIsLoading(false);
+  const fetchManga = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    setManga(null);
+    try {
+      const res = await getMangaDetail(id);
+      if (res?.data) {
+        setManga(res.data);
+      } else {
+        throw new Error('Manga not found');
       }
-    };
+    } catch (err) {
+      console.error('Failed to fetch manga detail:', err);
+      setError(err.response?.data?.message || 'Failed to load manga details.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
     fetchManga();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [id]);
+  }, [fetchManga]);
 
   // ─── Fetch chapters feed ───
   useEffect(() => {
     const fetchChapters = async () => {
-      // If it is a mock numeric ID, just mock chapters
-      if (/^\d+$/.test(id)) {
-        const mockId = parseInt(id, 10);
-        const mockChs = Array.from({ length: 20 }, (_, i) => ({
-          id: `${mockId}?chapter=${i + 1}`,
-          chapterNumber: String(i + 1),
-          title: `Chapter ${i + 1}`
-        }));
-        setChapters(mockChs);
-        return;
-      }
-
       setChaptersLoading(true);
       try {
         const res = await getMangaFeed(id);
@@ -248,22 +236,11 @@ export default function BookDetailPage() {
       setRecsLoading(true);
       try {
         const firstGenreId = manga.genres?.[0]?.mal_id;
-
-        // If firstGenreId is not a number, it's a MangaDex UUID.
-        // If it's a UUID, we pass includedTags[]=UUID to the gallery proxy
-        // If it's numeric, we pass genres=ID to the mock data legacy param
-        const isNumeric = firstGenreId !== undefined && !isNaN(parseInt(firstGenreId, 10)) && isFinite(firstGenreId);
-        
-        let queryParam = '';
-        if (firstGenreId) {
-            queryParam = isNumeric 
-              ? `genres=${firstGenreId}&` 
-              : `includedTags[]=${firstGenreId}&offset=0&`; // force offset=0 for mangadex proxy
-        }
+        const queryParam = firstGenreId !== undefined ? `genres=${firstGenreId}&` : '';
         const res = await axios.get(`/api/manga?${queryParam}limit=12`);
         if (res.data?.data) {
           const currentIdStr = String(manga.id || manga.mal_id);
-          const filtered = res.data.data.filter(m => String(m.mal_id) !== currentIdStr);
+          const filtered = res.data.data.filter(m => String(m.id || m.mal_id) !== currentIdStr);
           setRecommendations(filtered.slice(0, 6));
         }
       } catch (err) {
@@ -288,20 +265,11 @@ export default function BookDetailPage() {
       setIsBookmarked(false);
       toast('Bookmark removed', { icon: '🗑️' });
     } else {
-      // Store a simple normalized object in bookmarks so bookmarks page doesn't crash on layout fields
       const bookData = {
-        id: manga.id || manga.mal_id,
-        mal_id: manga.id || manga.mal_id,
-        title: manga.title || manga.title_english || manga.attributes?.title?.en || Object.values(manga.attributes?.title || {})[0] || 'Unknown Title',
-        images: manga.images || {
-          jpg: {
-            large_image_url: (() => {
-              const coverRel = manga.relationships?.find(r => r.type === 'cover_art');
-              const fileName = coverRel?.attributes?.fileName;
-              return fileName ? `https://uploads.mangadex.org/covers/${manga.id}/${fileName}` : '';
-            })()
-          }
-        },
+        id: manga.id || String(manga.mal_id),
+        mal_id: manga.mal_id || manga.id,
+        title: manga.title,
+        images: manga.images,
         score: manga.score || 0
       };
       bookmarks.push(bookData);
@@ -340,20 +308,28 @@ export default function BookDetailPage() {
       });
   };
 
-  // ─── Error state ───
+  // ─── Error state with retry ───
   if (error && !isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-32 px-4 text-center animate-fade-in">
         <div className="text-5xl mb-6">😵</div>
-        <h2 className="text-2xl font-extrabold text-brand-textMain mb-3">Oops! Something went wrong</h2>
+        <h2 className="text-2xl font-extrabold text-brand-textMain mb-3">Oops! Gagal Memuat Data</h2>
         <p className="text-brand-textMuted mb-8 max-w-md">{error}</p>
-        <button
-          onClick={() => navigate('/catalog')}
-          className="flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold bg-brand-orange hover:bg-brand-accent text-white shadow-neon hover:shadow-neon-hover transition-all"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Catalog
-        </button>
+        <div className="flex gap-4">
+          <button
+            onClick={fetchManga}
+            className="flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold bg-brand-orange hover:bg-brand-accent text-white shadow-neon hover:shadow-neon-hover transition-all cursor-pointer"
+          >
+            Coba Lagi
+          </button>
+          <button
+            onClick={() => navigate('/catalog')}
+            className="flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold bg-brand-cardBg border border-brand-border text-brand-textMain transition-all cursor-pointer hover:border-brand-orange/40"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Kembali ke Katalog
+          </button>
+        </div>
       </div>
     );
   }
@@ -377,12 +353,9 @@ export default function BookDetailPage() {
 
   if (!manga) return null;
 
-  // ─── Extract data ───
-  // Backend proxy already normalizes MangaDex UUID data into this exact shape
   const title = manga.title || manga.title_english || 'Unknown Title';
   const titleJp = manga.title_japanese || '';
   const imageUrl = manga.images?.jpg?.large_image_url || manga.images?.jpg?.image_url || 'https://via.placeholder.com/256x364?text=No+Cover';
-
   const score = manga.score ? manga.score.toFixed(1) : 'N/A';
   const rank = manga.rank || 'N/A';
   const popularity = manga.popularity || 'N/A';
@@ -391,7 +364,6 @@ export default function BookDetailPage() {
   const status = manga.status || 'Unknown';
   const synopsis = manga.synopsis || 'No description available for this manga.';
   const publishedStr = manga.published?.string || 'Unknown';
-
   const genres = manga.genres || [];
   const authors = manga.authors || [];
   const type = manga.type || 'Manga';
@@ -435,9 +407,12 @@ export default function BookDetailPage() {
 
           {/* Floating title inside hero */}
           <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8">
-            <span className="inline-block rounded-md bg-brand-orange/20 text-brand-orange border border-brand-orange/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest mb-2">
-              {type}
-            </span>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-block rounded-md bg-brand-orange/20 text-brand-orange border border-brand-orange/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest">
+                {type}
+              </span>
+              <DataSourceBadge source={manga.source} />
+            </div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight leading-tight">
               {title}
             </h1>
@@ -472,7 +447,7 @@ export default function BookDetailPage() {
               {/* Read Online */}
               <button
                 onClick={() => navigate(`/read/${manga.id || manga.mal_id}`)}
-                className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold bg-brand-orange hover:bg-brand-accent text-white shadow-neon hover:shadow-neon-hover transition-all duration-200 group"
+                className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold bg-brand-orange hover:bg-brand-accent text-white shadow-neon hover:shadow-neon-hover transition-all duration-200 group cursor-pointer"
               >
                 <BookOpen className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" />
                 Read Online
@@ -482,7 +457,7 @@ export default function BookDetailPage() {
               <div className="flex gap-2 w-full">
                 <button
                   onClick={handleBookmark}
-                  className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold border transition-all duration-200 ${
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold border transition-all duration-200 cursor-pointer ${
                     isBookmarked
                       ? 'bg-brand-orange/15 border-brand-orange text-brand-orange hover:bg-brand-orange/25 neon-pulse-glow shadow-neon'
                       : 'bg-brand-cardBg border-brand-border text-brand-textMain hover:border-brand-orange/50 hover:text-brand-orange'
@@ -710,7 +685,7 @@ export default function BookDetailPage() {
               <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar -mx-1 px-1">
                 {recommendations.map((rec, i) => (
                   <MiniRecCard
-                    key={rec.mal_id}
+                    key={rec.id || rec.mal_id}
                     manga={rec}
                     index={i}
                     navigate={navigate}
