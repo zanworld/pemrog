@@ -178,7 +178,7 @@ export default function App() {
     if (targetFilter) {
       const newFilters = { ...filters, query: '', genre: '', status: 'all', ...targetFilter };
       setFilters(newFilters);
-      fetchMangaData(newFilters);
+      fetchMangaData(false, newFilters);
       navigate('/catalog', { replace: true });
     }
   }, [location.pathname]);
@@ -203,7 +203,7 @@ export default function App() {
     setFilters(newFilters);
     setSelectedManga(null);
     navigate('/catalog');
-    fetchMangaData(newFilters);
+    fetchMangaData(false, newFilters);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
