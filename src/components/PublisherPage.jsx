@@ -36,7 +36,16 @@ export default function PublisherPage({ publisherId, favorites = [], onToggleFav
     setIsLoading(true);
     setError(null);
     try {
-      const url = `/api/manga?q=${encodeURIComponent(publisher.name)}&limit=24&page=${page}`;
+      let url;
+      if (publisher.jikanIds) {
+        // JP publishers: use Jikan magazine filter via dedicated route
+        url = `/api/manga/by-publisher?magazines=${encodeURIComponent(publisher.jikanIds)}&limit=24&page=${page}`;
+      } else if (publisher.q) {
+        // EN publishers: keyword search (note: results are approximate, not a strict license filter)
+        url = `/api/manga/by-publisher?q=${encodeURIComponent(publisher.q)}&limit=24&page=${page}`;
+      } else {
+        url = `/api/manga?q=${encodeURIComponent(publisher.name)}&limit=24&page=${page}`;
+      }
 
       const res = await axios.get(url);
       if (res.data && res.data.data) {
@@ -58,6 +67,7 @@ export default function PublisherPage({ publisherId, favorites = [], onToggleFav
   useEffect(() => {
     fetchPublisherManga(currentPage);
   }, [publisherId, currentPage]);
+
 
   return (
     <div className="animate-fade-in">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Clock, CheckCircle, ArrowRight, ChevronLeft, CalendarCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -16,6 +16,8 @@ export default function BookingPage() {
 
   const { token, isAuthenticated } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingRef = useRef(null);
 
   const fetchOccupiedSeats = async () => {
     if (formData.date && formData.slot && token) {
@@ -33,9 +35,36 @@ export default function BookingPage() {
     }
   };
 
+  // Initial fetch when date+slot change
   useEffect(() => {
     fetchOccupiedSeats();
   }, [formData, token]);
+
+  // Real-time polling while user is on step 2 (seat selection)
+  useEffect(() => {
+    // Clear any existing interval first
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
+    if (step === 2 && formData.date && formData.slot && token) {
+      setIsPolling(true);
+      pollingRef.current = setInterval(async () => {
+        await fetchOccupiedSeats();
+      }, 7000); // poll every 7 seconds
+    } else {
+      setIsPolling(false);
+    }
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      setIsPolling(false);
+    };
+  }, [step, formData.date, formData.slot, token]);
 
   const bookedSeats = [...new Set([...dynamicBookedSeats])];
 
@@ -181,13 +210,21 @@ export default function BookingPage() {
               transition={{ duration: 0.3 }}
               className="space-y-6"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <h2 className="text-lg font-bold text-brand-orange flex items-center gap-2">
                   <span className="flex items-center justify-center bg-brand-orange text-white rounded-full w-6 h-6 text-xs font-bold">2</span>
                   Pilih Kursi Anda
                 </h2>
-                <div className="text-xs text-brand-textMuted bg-brand-darkBg px-3 py-1.5 rounded-full border border-brand-border">
-                  <span className="font-bold text-brand-textMain">{formData.date}</span> • {formData.slot}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {isPolling && (
+                    <span className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 border border-emerald-400/30 px-2.5 py-1 rounded-full animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+                      Live
+                    </span>
+                  )}
+                  <div className="text-xs text-brand-textMuted bg-brand-darkBg px-3 py-1.5 rounded-full border border-brand-border">
+                    <span className="font-bold text-brand-textMain">{formData.date}</span> • {formData.slot}
+                  </div>
                 </div>
               </div>
 

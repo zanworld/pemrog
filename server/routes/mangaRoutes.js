@@ -36,6 +36,76 @@ router.get('/manga/genres', async (req, res) => {
   }
 });
 
+// GET /api/manga/by-publisher?magazines=8,87,88,113  OR  ?q=viz&limit=24&page=1
+// For JP publishers (magazines param): proxies directly to Jikan /manga?magazines=...
+// For EN publishers (q param): does a title/query search via dataSource (MangaDex-first)
+router.get('/manga/by-publisher', async (req, res) => {
+  const { magazines, q, limit = 24, page = 1 } = req.query;
+
+  try {
+    if (magazines) {
+      // Use Jikan directly — MangaDex has no magazine/publisher concept
+      const { default: axios } = await import('axios');
+      const jikanRes = await axios.get('https://api.jikan.moe/v4/manga', {
+        params: {
+          magazines,
+          order_by: 'popularity',
+          sort: 'desc',
+          limit: parseInt(limit, 10) || 24,
+          page: parseInt(page, 10) || 1,
+        },
+        timeout: 15000,
+      });
+
+      const raw = jikanRes.data?.data ?? [];
+      // Adapt Jikan items to the same shape the frontend expects
+      const adapted = raw.map(item => ({
+        id: String(item.mal_id),
+        mal_id: item.mal_id,
+        title: item.title,
+        title_english: item.title_english,
+        synopsis: item.synopsis,
+        score: item.score,
+        rank: item.rank,
+        popularity: item.popularity,
+        status: item.status,
+        type: item.type,
+        chapters: item.chapters,
+        volumes: item.volumes,
+        images: item.images,
+        imageUrl: item.images?.jpg?.large_image_url || item.images?.jpg?.image_url,
+        genres: item.genres || [],
+        authors: (item.authors || []).map(a => ({ name: a.name })),
+        published: item.published,
+        source: 'jikan',
+      }));
+
+      return res.json({ data: adapted, total: jikanRes.data?.pagination?.items?.total ?? adapted.length });
+    }
+
+    if (q) {
+      // EN publishers — fallback to title search via regular dataSource
+      const result = await dataSource.searchManga(
+        q,
+        parseInt(limit, 10) || 24,
+        parseInt(page, 10) || 1,
+        '',    // no genre filter
+        '',    // no status filter
+        'popularity',
+        'desc'
+      );
+      return res.json(result);
+    }
+
+    return res.status(400).json({ error: 'Provide either magazines or q parameter' });
+  } catch (err) {
+    console.error('Error in by-publisher route:', err.message);
+    res.status(500).json({ error: 'Failed to fetch publisher manga' });
+  }
+});
+
+
+
 // GET /api/manga/:id
 router.get('/manga/:id', async (req, res) => {
   const { id } = req.params;
