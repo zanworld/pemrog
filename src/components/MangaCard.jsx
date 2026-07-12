@@ -23,7 +23,7 @@ export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClick
 
   return (
     <div 
-      onClick={() => navigate(`/book/${manga.mal_id}`)}
+      onClick={() => navigate(`/book/${manga.id || manga.mal_id}`)}
       className="group relative flex flex-col overflow-hidden rounded-2xl bg-brand-cardBg border border-brand-border cursor-pointer transition-all duration-300 hover:-translate-y-1.5 hover:border-brand-orange/40 hover:shadow-neon"
     >
       {/* Cover Image Container */}

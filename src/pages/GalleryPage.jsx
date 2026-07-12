@@ -382,7 +382,7 @@ export default function GalleryPage() {
             : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'}>
             <AnimatePresence>
               {mangas.map((manga) => {
-                const id = manga.mal_id || manga.id;
+                const id = manga.id || manga.mal_id;
                 const title = getTitle(manga);
                 const coverUrl = getCoverUrl(manga);
                 const genres = getGenres(manga);

@@ -205,7 +205,7 @@ export default function ProfilePage() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.1 * Math.min(idx, 5) }}
-                onClick={() => navigate(`/book/${manga.mal_id}`)}
+                onClick={() => navigate(`/book/${manga.id || manga.mal_id}`)}
                 className="min-w-[120px] w-[120px] sm:min-w-[140px] sm:w-[140px] cursor-pointer group snap-start"
               >
                 <div className="aspect-[3/4] rounded-xl overflow-hidden mb-2 relative border border-brand-border/40">
