@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, Search, User, Loader2, Star } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 export default function Header({ isSidebarOpen, setIsSidebarOpen, onSearch, currentQuery }) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -58,10 +59,15 @@ export default function Header({ isSidebarOpen, setIsSidebarOpen, onSearch, curr
     }
   };
 
-  const handleSuggestionClick = (title) => {
-    setQuery(title);
-    onSearch(title);
-    setShowSuggestions(false);
+  const handleSuggestionClick = (mangaOrTitle) => {
+    if (typeof mangaOrTitle === 'string') {
+      setQuery(mangaOrTitle);
+      onSearch(mangaOrTitle);
+      setShowSuggestions(false);
+    } else {
+      setShowSuggestions(false);
+      navigate(`/book/${mangaOrTitle.id || mangaOrTitle.mal_id}`);
+    }
   };
 
   return (
@@ -121,7 +127,7 @@ export default function Header({ isSidebarOpen, setIsSidebarOpen, onSearch, curr
                        return (
                          <button
                            key={manga.mal_id}
-                           onClick={() => handleSuggestionClick(title)}
+                           onClick={() => handleSuggestionClick(manga)}
                            className="flex items-center gap-3 w-full p-3 hover:bg-brand-orange/10 transition-colors text-left border-b border-brand-border/40 last:border-0"
                          >
                            {image && (

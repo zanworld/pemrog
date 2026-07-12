@@ -188,7 +188,7 @@ export default function ProfilePage() {
           <StatCard
             icon={<Heart className="w-5 h-5 fill-rose-500/20" />}
             label="Favorites"
-            value={stats.favorites}
+            value={favoriteList.length}
             iconBg="bg-rose-500/10"
             iconColor="text-rose-500"
           />
