@@ -41,7 +41,7 @@ export default function PublisherPage({ publisherId, favorites = [], onToggleFav
       const res = await axios.get(url);
       if (res.data && res.data.data) {
         // Enforce uniqueness to prevent Jikan API duplicates
-        const uniqueData = res.data.data.filter((v, i, a) => a.findIndex(v2 => (v2.mal_id === v.mal_id)) === i);
+        const uniqueData = res.data.data.filter((v, i, a) => a.findIndex(v2 => (v2.id === v.id)) === i);
         setMangaList(uniqueData);
       } else {
         throw new Error('Empty response');

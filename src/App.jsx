@@ -147,7 +147,7 @@ export default function App() {
 
       if (response.data && response.data.data) {
         // Enforce uniqueness to prevent Jikan API duplicates
-        const uniqueData = response.data.data.filter((v, i, a) => a.findIndex(v2 => (v2.mal_id === v.mal_id)) === i);
+        const uniqueData = response.data.data.filter((v, i, a) => a.findIndex(v2 => (v2.id === v.id)) === i);
         setMangaList(uniqueData);
       } else {
         throw new Error("Response empty or invalid");

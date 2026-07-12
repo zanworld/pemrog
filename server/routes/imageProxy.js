@@ -14,15 +14,26 @@ router.get('/manga-image', async (req, res) => {
   if (!target) return res.status(400).json({ message: 'Parameter url wajib diisi' });
 
   // Validasi sederhana untuk mencegah penyalahgunaan (SSRF):
-  // hanya izinkan https dan path gambar chapter MangaDex (/data/ atau /data-saver/).
+  // hanya izinkan https, domain terkait MangaDex, dan path (/data/, /data-saver/, atau /covers/).
   let parsed;
   try {
     parsed = new URL(target);
   } catch {
     return res.status(400).json({ message: 'URL tidak valid' });
   }
-  if (parsed.protocol !== 'https:' || !/\/(data|data-saver)\//.test(parsed.pathname)) {
-    return res.status(400).json({ message: 'URL bukan halaman chapter MangaDex' });
+  if (parsed.protocol !== 'https:') {
+    return res.status(400).json({ message: 'Protokol harus HTTPS' });
+  }
+
+  const isAllowedHost = 
+    parsed.hostname === 'uploads.mangadex.org' || 
+    parsed.hostname.endsWith('.mangadex.org') || 
+    parsed.hostname.endsWith('.mangadex.network');
+
+  const isAllowedPath = /\/(data|data-saver|covers)\//.test(parsed.pathname);
+
+  if (!isAllowedHost || !isAllowedPath) {
+    return res.status(400).json({ message: 'URL atau domain tidak diizinkan' });
   }
 
   try {
