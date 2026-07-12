@@ -17,7 +17,7 @@
   --modal-border: rgba(0, 0, 0, 0.08);
 }
 
-:root.dark {
+.dark {
   --app-orange: #FF5722;
   --app-darkBg: #131214;
   --app-cardBg: #1e1c20;
@@ -90,4 +90,20 @@
 
 .neon-pulse-glow {
   animation: neon-pulse 3s infinite ease-in-out;
+}
+
+/* Native fade-in keyframes & class to replace JS-driven animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

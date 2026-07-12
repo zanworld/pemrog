@@ -370,7 +370,7 @@ export default function App() {
         )}
 
         {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-[#0a0a0a]">
+        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-brand-darkBg transition-colors duration-300">
           <main className={isReaderMode ? "flex-grow w-full h-full" : "flex-grow mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8"}>
             <AppRouter
               catalogElement={catalogView}

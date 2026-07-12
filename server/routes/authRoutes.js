@@ -100,8 +100,18 @@ router.patch('/profile', (req, res) => {
   }
 
   try {
-    db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name.trim(), userId);
-    const user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(userId);
+    let user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(userId);
+    if (!user) {
+      // Re-create the user in this container's SQLite instance using JWT payload info
+      const decoded = jwt.decode(token);
+      db.prepare('INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)')
+        .run(userId, name.trim(), decoded.email || `user_${userId}@example.com`, 'restored-session-dummy-hash');
+      user = { id: userId, name: name.trim(), email: decoded.email || `user_${userId}@example.com` };
+    } else {
+      db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name.trim(), userId);
+      user.name = name.trim();
+    }
+
     const newToken = jwt.sign({ id: user.id, email: user.email, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ success: true, user, token: newToken });
   } catch (error) {

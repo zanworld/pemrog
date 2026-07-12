@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { User, Mail, Edit2, Check, X, Heart, Bookmark, BookOpen, Calendar, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -121,11 +120,7 @@ export default function ProfilePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
 
         {/* ── Profile Card ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="col-span-1 glass-panel p-6 rounded-3xl border border-brand-border/40 flex flex-col items-center text-center space-y-4 shadow-xl shadow-black/20"
-        >
+        <div className="col-span-1 glass-panel p-6 rounded-3xl border border-brand-border/40 flex flex-col items-center text-center space-y-4 shadow-xl shadow-black/20 animate-fade-in">
           {/* Avatar */}
           <div className="relative">
             <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-brand-orange to-brand-accent shadow-neon">
@@ -186,15 +181,10 @@ export default function ProfilePage() {
               </button>
             )}
           </div>
-        </motion.div>
+        </div>
 
         {/* ── Stats Grid ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4"
-        >
+        <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4 animate-fade-in" style={{ animationDelay: '0.1s' }}>
           <StatCard
             icon={<Heart className="w-5 h-5 fill-rose-500/20" />}
             label="Favorites"
@@ -237,16 +227,11 @@ export default function ProfilePage() {
               <span className="text-sm text-brand-textMuted italic">None yet</span>
             )}
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* ── Favorites Showcase ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="pt-6"
-      >
+      <div className="pt-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-brand-textMain flex items-center gap-2">
             <Heart className="w-5 h-5 text-brand-orange fill-brand-orange" />
@@ -279,13 +264,11 @@ export default function ProfilePage() {
         ) : (
           <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar snap-x snap-mandatory">
             {favoriteList.map((manga, idx) => (
-              <motion.div
+              <div
                 key={manga.id || manga.mal_id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.05 * Math.min(idx, 8) }}
                 onClick={() => navigate(`/book/${manga.id || manga.mal_id}`)}
-                className="min-w-[120px] w-[120px] sm:min-w-[140px] sm:w-[140px] cursor-pointer group snap-start flex-shrink-0"
+                className="min-w-[120px] w-[120px] sm:min-w-[140px] sm:w-[140px] cursor-pointer group snap-start flex-shrink-0 animate-fade-in"
+                style={{ animationDelay: `${0.05 * Math.min(idx, 8)}s` }}
               >
                 <div className="aspect-[3/4] rounded-xl overflow-hidden mb-2 relative border border-brand-border/40 bg-brand-cardBg">
                   <img
@@ -309,11 +292,11 @@ export default function ProfilePage() {
                 <h4 className="text-xs font-bold text-brand-textMain line-clamp-2 group-hover:text-brand-orange transition-colors">
                   {manga.title}
                 </h4>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}
-      </motion.div>
+      </div>
     </div>
   );
 }
