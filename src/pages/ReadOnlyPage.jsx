@@ -9,14 +9,14 @@ import toast from 'react-hot-toast';
 
 import useIdleTimer from '../hooks/useIdleTimer';
 import PageThumbnails from '../components/PageThumbnails';
-
-const TOTAL_PAGES = 10;
+import PageImage from '../components/PageImage';
+import { samplePages, sampleDataSaverPages } from '../data/samplePages';
 
 export default function ReadOnlyPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const chapter = searchParams.get('chapter');
+  const chapter = searchParams.get('chapter') || '1';
 
   // Toast current chapter
   useEffect(() => {
@@ -25,21 +25,22 @@ export default function ReadOnlyPage() {
     }
   }, [chapter]);
 
-  // Load saved preferences
-  const getSavedPage = () => {
-    const saved = localStorage.getItem(`reading_progress_${id}`);
-    return saved ? parseInt(saved, 10) : 1;
-  };
   const getSavedMode = () => localStorage.getItem('settings_reader_mode') || 'single';
   const getSavedBrightness = () => {
     const saved = localStorage.getItem('settings_reader_brightness');
     return saved ? parseInt(saved, 10) : 100;
   };
 
-  const [currentPage, setCurrentPage] = useState(getSavedPage);
+  const [currentPage, setCurrentPage] = useState(1);
   const [readMode, setReadMode] = useState(getSavedMode); // 'single', 'double', 'vertical'
   const [brightness, setBrightness] = useState(getSavedBrightness); // 0-100
   const [zoomLevel, setZoomLevel] = useState(100); // 50-200
+  
+  const [dataPages, setDataPages] = useState([]);
+  const [dataSaverPages, setDataSaverPages] = useState([]);
+  const [quality, setQuality] = useState('data-saver');
+  const [totalPages, setTotalPages] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [showSettings, setShowSettings] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(false);
@@ -51,10 +52,91 @@ export default function ReadOnlyPage() {
 
   const verticalScrollRef = useRef(null);
 
-  // Save progress and settings
+  // Fetch initial progress
   useEffect(() => {
-    localStorage.setItem(`reading_progress_${id}`, currentPage);
-  }, [currentPage, id]);
+    const fetchProgress = async () => {
+      const localKey = `progress_manga_${id}_${chapter}`;
+      const localSaved = localStorage.getItem(localKey);
+
+      const token = localStorage.getItem('token');
+      if (token && id) {
+        try {
+          const res = await fetch(`/api/progress/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (data.success && data.progress && data.progress.chapter_id === chapter) {
+            setCurrentPage(data.progress.last_page);
+            return;
+          }
+        } catch (err) {}
+      }
+
+      if (localSaved) {
+        const parsed = parseInt(localSaved, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          setCurrentPage(parsed);
+        }
+      }
+    };
+    fetchProgress();
+  }, [id, chapter]);
+
+  // Save progress
+  useEffect(() => {
+    const saveProgress = async () => {
+      if (!id || !chapter || totalPages === 0) return;
+      
+      const localKey = `progress_manga_${id}_${chapter}`;
+      localStorage.setItem(localKey, currentPage.toString());
+
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      try {
+        await fetch('/api/progress', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ manga_id: id, chapter_id: chapter, last_page: currentPage })
+        });
+      } catch (err) {}
+    };
+    const timer = setTimeout(saveProgress, 1000); // debounce
+    return () => clearTimeout(timer);
+  }, [currentPage, id, chapter, totalPages]);
+
+  // Fetch Chapter Pages
+  const fetchPages = useCallback(async () => {
+    if (!chapter) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/chapter/${chapter}/pages`);
+      const data = await res.json();
+      if (data.success && data.data && data.data.length > 0) {
+        setDataPages(data.data);
+        setDataSaverPages(data.dataSaver || data.data);
+        setTotalPages(data.total || data.data.length);
+      } else {
+        toast.error('Gagal mengambil halaman manga, memuat halaman contoh');
+        setDataPages(samplePages);
+        setDataSaverPages(sampleDataSaverPages);
+        setTotalPages(samplePages.length);
+      }
+    } catch (err) {
+      toast.error('Gagal mengambil halaman manga, memuat halaman contoh');
+      setDataPages(samplePages);
+      setDataSaverPages(sampleDataSaverPages);
+      setTotalPages(samplePages.length);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [chapter]);
+
+  useEffect(() => {
+    fetchPages();
+  }, [fetchPages]);
 
   useEffect(() => {
     localStorage.setItem('settings_reader_mode', readMode);
@@ -70,10 +152,10 @@ export default function ReadOnlyPage() {
   }, [brightness]);
 
   const goToPage = useCallback((newPage) => {
-    if (newPage < 1 || newPage > TOTAL_PAGES) return;
+    if (newPage < 1 || newPage > totalPages) return;
     setDirection(newPage > currentPage ? 1 : -1);
     setCurrentPage(newPage);
-  }, [currentPage]);
+  }, [currentPage, totalPages]);
 
   const handlePrev = useCallback((e) => {
     if (e) e.stopPropagation();
@@ -87,14 +169,14 @@ export default function ReadOnlyPage() {
 
   const handleNext = useCallback((e) => {
     if (e) e.stopPropagation();
-    const isLastBoundary = readMode === 'double' ? currentPage >= TOTAL_PAGES - 1 : currentPage === TOTAL_PAGES;
+    const isLastBoundary = readMode === 'double' ? currentPage >= totalPages - 1 : currentPage === totalPages;
     if (isLastBoundary) {
       toast('Memuat Chapter Selanjutnya...', { icon: '⏭️' });
       return;
     }
     const step = readMode === 'double' ? 2 : 1;
-    goToPage(Math.min(TOTAL_PAGES, currentPage + step));
-  }, [currentPage, goToPage, readMode]);
+    goToPage(Math.min(totalPages, currentPage + step));
+  }, [currentPage, goToPage, readMode, totalPages]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -132,7 +214,41 @@ export default function ReadOnlyPage() {
   const zoomReset = (e) => { e.stopPropagation(); setZoomLevel(100); };
 
   // Generate image URL
-  const getImageUrl = (page) => `https://picsum.photos/800/1200?random=${id}-${page}`;
+  const getImageUrl = useCallback((page) => {
+    if (page < 1 || page > totalPages) return '';
+    const index = page - 1;
+    const url = quality === 'data' ? dataPages[index] : dataSaverPages[index];
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      if (url.includes('placehold.co')) return url;
+      return `/api/manga-image?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  }, [totalPages, quality, dataPages, dataSaverPages]);
+
+  const handleImageError = () => {
+    fetchPages(); // Attempt to refetch if token expired
+  };
+
+  // Preload next pages
+  useEffect(() => {
+    if (totalPages === 0) return;
+    const preloadPage = (page) => {
+      const url = getImageUrl(page);
+      if (url) {
+        const img = new Image();
+        img.src = url;
+      }
+    };
+    
+    if (readMode === 'single' || readMode === 'vertical') {
+      if (currentPage + 1 <= totalPages) preloadPage(currentPage + 1);
+      if (currentPage + 2 <= totalPages) preloadPage(currentPage + 2);
+    } else if (readMode === 'double') {
+      if (currentPage + 2 <= totalPages) preloadPage(currentPage + 2);
+      if (currentPage + 3 <= totalPages) preloadPage(currentPage + 3);
+    }
+  }, [currentPage, totalPages, readMode, getImageUrl]);
 
   // Brightness overlay style
   const overlayStyle = {
@@ -143,7 +259,7 @@ export default function ReadOnlyPage() {
   // Render Page Content based on mode
   const renderContent = () => {
     if (readMode === 'vertical') {
-      const pages = Array.from({ length: TOTAL_PAGES }, (_, i) => i + 1);
+      const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
       return (
         <div 
           ref={verticalScrollRef}
@@ -160,11 +276,10 @@ export default function ReadOnlyPage() {
             
             {pages.map(page => (
               <div key={page} className="relative w-full shadow-2xl">
-                <img 
+                <PageImage 
                   src={getImageUrl(page)}
-                  loading="lazy"
                   alt={`Page ${page}`}
-                  className="w-full h-auto object-contain"
+                  className="w-full h-auto object-contain min-h-[400px]"
                 />
                 <div className="absolute inset-0" style={overlayStyle}></div>
                 {/* Page indicator overlay for vertical mode */}
@@ -214,10 +329,10 @@ export default function ReadOnlyPage() {
             }}
           >
             {/* Image 1 */}
-            <div className="relative h-full max-w-full flex items-center shadow-2xl">
-              <img
+            <div className="relative h-full max-w-full flex items-center shadow-2xl bg-[#0a0a0a]">
+              <PageImage
                 src={getImageUrl(currentPage)}
-                className="h-full w-auto object-contain max-h-screen"
+                className="h-full w-auto object-contain max-h-screen min-w-[200px]"
                 alt={`Page ${currentPage}`}
                 draggable={false}
               />
@@ -225,11 +340,11 @@ export default function ReadOnlyPage() {
             </div>
 
             {/* Image 2 (Double Mode) */}
-            {readMode === 'double' && currentPage < TOTAL_PAGES && (
-              <div className="relative h-full max-w-full flex items-center shadow-2xl ml-[1px]">
-                <img
+            {readMode === 'double' && currentPage < totalPages && (
+              <div className="relative h-full max-w-full flex items-center shadow-2xl ml-[1px] bg-[#0a0a0a]">
+                <PageImage
                   src={getImageUrl(currentPage + 1)}
-                  className="h-full w-auto object-contain max-h-screen"
+                  className="h-full w-auto object-contain max-h-screen min-w-[200px]"
                   alt={`Page ${currentPage + 1}`}
                   draggable={false}
                 />
@@ -249,7 +364,7 @@ export default function ReadOnlyPage() {
           </div>
         )}
 
-        {((readMode === 'single' && currentPage === TOTAL_PAGES) || (readMode === 'double' && currentPage >= TOTAL_PAGES - 1)) && (
+        {((readMode === 'single' && currentPage === totalPages) || (readMode === 'double' && currentPage >= totalPages - 1)) && (
           <div className="absolute right-8 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100 transition-opacity">
             <button onClick={handleNext} className="flex flex-col items-center p-4 bg-black/50 rounded-xl">
               <ChevronRight className="w-8 h-8 mb-2 text-brand-orange" />
@@ -264,6 +379,14 @@ export default function ReadOnlyPage() {
       </div>
     );
   };
+
+  if (isLoading) {
+    return (
+      <div className="absolute inset-0 bg-[#0a0a0a] text-white flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 animate-spin text-brand-orange" />
+      </div>
+    );
+  }
 
   return (
     <div className="absolute inset-0 bg-[#0a0a0a] text-white overflow-hidden flex flex-col items-center justify-center select-none">
@@ -303,10 +426,16 @@ export default function ReadOnlyPage() {
             <div className="flex items-center gap-4 relative">
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowThumbnails(true); }}
-                className="flex items-center gap-2 p-2 px-3 rounded-full hover:bg-white/10 transition-colors"
+                className="flex items-center gap-2 p-2 px-3 rounded-full hover:bg-white/10 transition-colors bg-white/5 border border-white/10"
               >
-                <Grid className="w-5 h-5" />
-                <span className="text-sm font-medium hidden sm:inline">Halaman</span>
+                <Grid className="w-4 h-4 text-brand-orange" />
+                <span className="text-sm font-bold flex items-center">
+                  <span className="text-white/50 font-normal mr-1 hidden sm:inline">Halaman</span>
+                  {currentPage}
+                  {readMode === 'double' && currentPage < totalPages && `-${currentPage + 1}`}
+                  <span className="text-white/40 mx-1">dari</span>
+                  {totalPages}
+                </span>
               </button>
               
               <button 
@@ -353,6 +482,25 @@ export default function ReadOnlyPage() {
                         >
                           <List className="w-5 h-5" />
                           <span className="text-[10px] font-bold">Scroll</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quality Toggle */}
+                    <div className="mb-6">
+                      <h4 className="text-xs font-bold mb-3 text-white/50 uppercase tracking-wider">Kualitas Gambar</h4>
+                      <div className="flex bg-white/5 rounded-lg p-1">
+                        <button 
+                          onClick={() => setQuality('data-saver')}
+                          className={`flex-1 py-2 text-xs font-bold rounded-md transition-colors ${quality === 'data-saver' ? 'bg-brand-orange text-white' : 'text-white/50 hover:text-white'}`}
+                        >
+                          Hemat Data
+                        </button>
+                        <button 
+                          onClick={() => setQuality('data')}
+                          className={`flex-1 py-2 text-xs font-bold rounded-md transition-colors ${quality === 'data' ? 'bg-brand-orange text-white' : 'text-white/50 hover:text-white'}`}
+                        >
+                          Kualitas Penuh
                         </button>
                       </div>
                     </div>
@@ -413,10 +561,11 @@ export default function ReadOnlyPage() {
               <ChevronLeft className="w-6 h-6" />
             </button>
             <div className="px-4 py-1 rounded-full bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setShowThumbnails(true)}>
-              <span className="font-bold text-sm min-w-[80px] text-center tracking-widest text-white/90">
+              <span className="font-bold text-sm text-center text-white/90 flex gap-1 items-center">
+                <span className="text-white/50 text-xs mr-1 hidden sm:inline">Halaman</span>
                 {currentPage} 
-                {readMode === 'double' && currentPage < TOTAL_PAGES && `-${currentPage + 1}`}
-                <span className="text-white/40"> / </span> {TOTAL_PAGES}
+                {readMode === 'double' && currentPage < totalPages && `-${currentPage + 1}`}
+                <span className="text-white/40"> dari </span> {totalPages}
               </span>
             </div>
             <button 
@@ -431,7 +580,7 @@ export default function ReadOnlyPage() {
 
       {/* Page Thumbnails Drawer */}
       <PageThumbnails 
-        totalPages={TOTAL_PAGES}
+        totalPages={totalPages}
         currentPage={currentPage}
         onSelectPage={(p) => { goToPage(p); setShowThumbnails(false); }}
         isOpen={showThumbnails}

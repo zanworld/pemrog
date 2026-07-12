@@ -167,10 +167,7 @@ export default function GalleryPage() {
 
   // ── Infinite scroll ──────────────────────────────────────────
   const loadMore = useCallback(() => {
-    if (isFetchingMore || !hasMore) {
-      setIsFetching(false);
-      return;
-    }
+    if (isFetchingMore || !hasMore) return;
     fetchBatch(page + 1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFetchingMore, hasMore, page, fetchBatch]);
