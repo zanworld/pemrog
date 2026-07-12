@@ -46,9 +46,14 @@ router.get('/manga/by-publisher', async (req, res) => {
     if (magazines) {
       // Use Jikan directly — MangaDex has no magazine/publisher concept
       const { default: axios } = await import('axios');
+
+      // Jikan expects array format: magazines[]=8&magazines[]=87...
+      // NOT a comma-separated string
+      const magazineIds = magazines.split(',').map(id => id.trim()).filter(Boolean);
+
       const jikanRes = await axios.get('https://api.jikan.moe/v4/manga', {
         params: {
-          magazines,
+          'magazines[]': magazineIds,
           order_by: 'popularity',
           sort: 'desc',
           limit: parseInt(limit, 10) || 24,
@@ -99,8 +104,8 @@ router.get('/manga/by-publisher', async (req, res) => {
 
     return res.status(400).json({ error: 'Provide either magazines or q parameter' });
   } catch (err) {
-    console.error('Error in by-publisher route:', err.message);
-    res.status(500).json({ error: 'Failed to fetch publisher manga' });
+    console.error('Error in by-publisher route:', err.message, err.response?.data ?? '');
+    res.status(500).json({ error: 'Failed to fetch publisher manga', detail: err.message });
   }
 });
 

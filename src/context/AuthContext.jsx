@@ -57,12 +57,18 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   };
 
+  const updateUser = (newUser, newToken) => {
+    setUser(newUser);
+    if (newToken) setToken(newToken);
+  };
+
   const value = {
     user,
     token,
     login,
     register,
     logout,
+    updateUser,
     isAuthenticated: !!token
   };
 

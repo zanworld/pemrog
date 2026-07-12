@@ -332,7 +332,7 @@ export default function App() {
   );
 
   return (
-    <div className="h-screen flex overflow-hidden bg-brand-darkBg text-brand-textMain select-none">
+    <div className="h-screen flex overflow-hidden bg-brand-darkBg text-brand-textMain select-none transition-colors duration-300">
       <Toaster
         position="bottom-right"
         toastOptions={{

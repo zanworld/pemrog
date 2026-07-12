@@ -89,7 +89,7 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen, onInteractive
         <div className="w-64 h-full flex flex-col">
           
           {/* Sidebar Header / Logo */}
-          <div className="flex h-16 items-center justify-between px-4 border-b border-brand-border shrink-0">
+          <div className="flex h-16 items-center justify-between px-4 border-b border-brand-border shrink-0 bg-brand-darkBg transition-colors duration-300">
             <NavLink to="/catalog" className="flex items-center gap-2 group">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-brand-orange to-brand-accent text-white shadow-neon transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
                 <BookOpen className="h-4 w-4" />

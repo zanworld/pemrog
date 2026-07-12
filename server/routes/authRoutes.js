@@ -80,4 +80,34 @@ router.post('/login', (req, res) => {
   }
 });
 
+// Update Display Name
+router.patch('/profile', (req, res) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  let userId;
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    userId = decoded.id;
+  } catch {
+    return res.status(401).json({ success: false, message: 'Invalid token' });
+  }
+
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ success: false, message: 'Name is required' });
+  }
+
+  try {
+    db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name.trim(), userId);
+    const user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(userId);
+    const newToken = jwt.sign({ id: user.id, email: user.email, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ success: true, user, token: newToken });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 export default router;

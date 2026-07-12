@@ -87,8 +87,9 @@ export const searchManga = async (query = '', limit = 12, page = 1, genres = '',
     limit,
     offset,
     'includes[]': ['cover_art', 'author'],
-    // BUG 4 FIX: only return manga with at least one available chapter
+    // Only return manga with at least one available chapter in English
     hasAvailableChapters: true,
+    'availableTranslatedLanguage[]': ['en'],
     // Limit to safe content for campus app context
     'contentRating[]': ['safe', 'suggestive'],
   };
