@@ -607,50 +607,67 @@ export default function BookDetailPage() {
             {/* ─ Tabs Content ─ */}
             <div className="min-h-[250px]">
               <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeTab}
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                >
-                  {activeTab === 'Sinopsis' && (
-                    <div className="bg-brand-darkBg/40 border border-brand-border/30 rounded-xl p-4 sm:p-5">
-                      <p className="text-sm leading-relaxed text-brand-textMuted whitespace-pre-line">
-                        {synopsis}
+                {activeTab === 'Sinopsis' && (
+                  <motion.div
+                    key="Sinopsis"
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                    inherit={false}
+                    className="bg-brand-darkBg/40 border border-brand-border/30 rounded-xl p-4 sm:p-5"
+                  >
+                    <p className="text-sm leading-relaxed text-brand-textMuted whitespace-pre-line">
+                      {synopsis}
+                    </p>
+                  </motion.div>
+                )}
+
+                {activeTab === 'Daftar Chapter' && (
+                  <motion.div
+                    key="Daftar Chapter"
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                    inherit={false}
+                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 w-full"
+                  >
+                    {chapters.length > 0 ? (
+                      chapters.map((ch) => (
+                        <button
+                          key={ch.id}
+                          onClick={() => navigate(`/read/${ch.id}`)}
+                          className="flex flex-col items-start p-3 bg-brand-cardBg/65 border border-brand-border/45 hover:border-brand-orange/50 hover:bg-brand-orange/5 hover:shadow-sm rounded-xl transition-all text-left group cursor-pointer w-full overflow-hidden"
+                        >
+                          <span className="text-xs font-bold text-brand-textMain group-hover:text-brand-orange transition-colors">
+                            Chapter {ch.chapterNumber}
+                          </span>
+                          <span className="text-[10px] text-brand-textMuted mt-0.5 truncate max-w-full">
+                            {ch.title || 'Klik untuk membaca'}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-xs text-brand-textMuted col-span-full text-center py-8">
+                        {chaptersLoading ? 'Memuat daftar chapter...' : 'Daftar chapter tidak tersedia.'}
                       </p>
-                    </div>
-                  )}
+                    )}
+                  </motion.div>
+                )}
 
-                  {activeTab === 'Daftar Chapter' && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 w-full">
-                      {chapters.length > 0 ? (
-                        chapters.map((ch) => (
-                          <button
-                            key={ch.id}
-                            onClick={() => navigate(`/read/${ch.id}`)}
-                            className="flex flex-col items-start p-3 bg-brand-cardBg/65 border border-brand-border/45 hover:border-brand-orange/50 hover:bg-brand-orange/5 hover:shadow-sm rounded-xl transition-all text-left group cursor-pointer w-full overflow-hidden"
-                          >
-                            <span className="text-xs font-bold text-brand-textMain group-hover:text-brand-orange transition-colors">
-                              Chapter {ch.chapterNumber}
-                            </span>
-                            <span className="text-[10px] text-brand-textMuted mt-0.5 truncate max-w-full">
-                              {ch.title || 'Klik untuk membaca'}
-                            </span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="text-xs text-brand-textMuted col-span-full text-center py-8">
-                          {chaptersLoading ? 'Memuat daftar chapter...' : 'Daftar chapter tidak tersedia.'}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {activeTab === 'Ulasan' && (
+                {activeTab === 'Ulasan' && (
+                  <motion.div
+                    key="Ulasan"
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                    inherit={false}
+                  >
                     <ReviewSection mangaId={manga.id || manga.mal_id} />
-                  )}
-                </motion.div>
+                  </motion.div>
+                )}
               </AnimatePresence>
             </div>
 
