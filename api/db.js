@@ -6,9 +6,12 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Ensure data directory exists
-const dataDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) {
+// In Vercel serverless environment, the filesystem is read-only except for /tmp.
+// We must place the database file in /tmp so it can be created and written to.
+const isVercel = !!process.env.VERCEL;
+const dataDir = isVercel ? '/tmp' : path.join(__dirname, 'data');
+
+if (!isVercel && !fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 

@@ -10,6 +10,11 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('hybrid_library_token') || null);
   const [loading, setLoading] = useState(true);
 
+  const logout = () => {
+    setToken(null);
+    setUser(null);
+  };
+
   // Configure axios to always send token if available
   useEffect(() => {
     if (token) {
@@ -50,11 +55,6 @@ export const AuthProvider = ({ children }) => {
       setUser(response.data.user);
     }
     return response.data;
-  };
-
-  const logout = () => {
-    setToken(null);
-    setUser(null);
   };
 
   const value = {
