@@ -1,15 +1,15 @@
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
-import mangaRoutes from './routes/mangaRoutes.js';
-import chapterRoutes from './routes/chapterRoutes.js';
-import imageProxy from './routes/imageProxy.js';
-import authRoutes from './routes/authRoutes.js';
-import bookingRoutes from './routes/bookingRoutes.js';
-import reviewRoutes from './routes/reviewRoutes.js';
-import progressRoutes from './routes/progressRoutes.js';
-import { authenticateToken } from './middleware/auth.js';
-import db, { initDB } from './db.js';
+import mangaRoutes from '../server/routes/mangaRoutes.js';
+import chapterRoutes from '../server/routes/chapterRoutes.js';
+import imageProxy from '../server/routes/imageProxy.js';
+import authRoutes from '../server/routes/authRoutes.js';
+import bookingRoutes from '../server/routes/bookingRoutes.js';
+import reviewRoutes from '../server/routes/reviewRoutes.js';
+import progressRoutes from '../server/routes/progressRoutes.js';
+import { authenticateToken } from '../server/middleware/auth.js';
+import db, { initDB } from '../server/db.js';
 
 const app = express();
 app.use(cors());
