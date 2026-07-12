@@ -21,9 +21,12 @@ const getMockMangaByUuid = (uuid) => {
 const adaptMangaDex = (item) => {
   const coverRel = item.relationships?.find(r => r.type === 'cover_art');
   const fileName = coverRel?.attributes?.fileName;
-  const imageUrl = fileName
+  const rawImageUrl = fileName
     ? `https://uploads.mangadex.org/covers/${item.id}/${fileName}`
     : 'https://via.placeholder.com/256x364?text=No+Cover';
+  const imageUrl = fileName
+    ? `/api/manga-image?url=${encodeURIComponent(rawImageUrl)}`
+    : rawImageUrl;
 
   const authors = (item.relationships || [])
     .filter(r => r.type === 'author')
@@ -44,7 +47,16 @@ const adaptMangaDex = (item) => {
   };
 
   const malIdStr = item.attributes?.links?.mal;
-  const mal_id = malIdStr ? parseInt(malIdStr, 10) : null;
+  let mal_id = malIdStr ? parseInt(malIdStr, 10) : null;
+  if (!mal_id) {
+    // Generate a unique synthetic mal_id based on item.id (UUID) to prevent null duplication issues
+    let hash = 0;
+    for (let i = 0; i < item.id.length; i++) {
+      hash = item.id.charCodeAt(i) + ((hash << 5) - hash);
+      hash = hash & hash;
+    }
+    mal_id = Math.abs(hash) + 1000000000;
+  }
 
   if (mal_id) {
     uuidToMalId.set(item.id, mal_id);
