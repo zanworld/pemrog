@@ -136,7 +136,7 @@ export const searchManga = async (query = '', limit = 12, page = 1, genres = '',
   // 1. Try MangaDex
   try {
     console.log('Fetching search from MangaDex...');
-    const rawData = await mangadex.searchManga(query, limit, page, genres, status, order_by, sort);
+    const rawData = await mangadex.searchManga(query, limit, page, genres, status, order_by, sort, sfw);
     if (rawData?.data) {
       return {
         data: rawData.data.map(adaptMangaDex),

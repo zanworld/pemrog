@@ -29,7 +29,7 @@ export default function Header({ isSidebarOpen, setIsSidebarOpen, onSearch, curr
       setIsLoading(true);
       setShowSuggestions(true);
       try {
-        const res = await axios.get(`/api/manga?q=${query}&limit=5`);
+        const res = await axios.get(`/api/manga?q=${query}&limit=5&sfw=true&genres_exclude=12,49,9,28,26,43`);
         setSuggestions(res.data?.data || []);
       } catch (err) {
         console.warn('Autocomplete fetch failed', err);
