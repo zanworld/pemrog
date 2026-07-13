@@ -15,9 +15,13 @@ function toDateStr(date) {
 }
 
 function parseDate(str) {
-  if (!str) return null;
-  const [y, m, d] = str.split('-').map(Number);
-  return new Date(y, m - 1, d);
+  if (!str || typeof str !== 'string') return null;
+  const parts = str.split('-');
+  if (parts.length !== 3) return null;
+  const [y, m, d] = parts.map(Number);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+  const date = new Date(y, m - 1, d);
+  return isNaN(date.getTime()) ? null : date;
 }
 
 /**
@@ -33,20 +37,32 @@ export default function CalendarPicker({ value, onChange, minDate, placeholder =
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const minDateObj = minDate ? parseDate(minDate) : today;
+  const minDateObj = (minDate && parseDate(minDate)) || today;
 
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(() => {
     const d = value ? parseDate(value) : today;
-    return d.getFullYear();
+    return d ? d.getFullYear() : today.getFullYear();
   });
   const [viewMonth, setViewMonth] = useState(() => {
     const d = value ? parseDate(value) : today;
-    return d.getMonth();
+    return d ? d.getMonth() : today.getMonth();
   });
 
   const wrapperRef = useRef(null);
   const buttonRef = useRef(null);
+
+  // Sync view when selected value changes from the outside (e.g. form reset)
+  useEffect(() => {
+    const d = parseDate(value);
+    if (d) {
+      setViewYear(d.getFullYear());
+      setViewMonth(d.getMonth());
+    } else {
+      setViewYear(today.getFullYear());
+      setViewMonth(today.getMonth());
+    }
+  }, [value]);
 
   // Close on outside click
   useEffect(() => {
