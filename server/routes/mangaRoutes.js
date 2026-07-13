@@ -1,5 +1,7 @@
 import express from 'express';
 import * as dataSource from '../services/dataSource.js';
+import * as jikan from '../services/jikan.js';
+import { mockMangaData } from '../../src/mockMangaData.js';
 
 const router = express.Router();
 
@@ -44,25 +46,19 @@ router.get('/manga/by-publisher', async (req, res) => {
 
   try {
     if (magazines) {
-      // Use Jikan directly — MangaDex has no magazine/publisher concept
-      const { default: axios } = await import('axios');
-
       // Jikan expects array format: magazines[]=8&magazines[]=87...
       // NOT a comma-separated string
       const magazineIds = magazines.split(',').map(id => id.trim()).filter(Boolean);
 
-      const jikanRes = await axios.get('https://api.jikan.moe/v4/manga', {
-        params: {
-          'magazines[]': magazineIds,
-          order_by: 'popularity',
-          sort: 'desc',
-          limit: parseInt(limit, 10) || 24,
-          page: parseInt(page, 10) || 1,
-        },
-        timeout: 15000,
+      const jikanRes = await jikan.searchManga({
+        'magazines[]': magazineIds,
+        order_by: 'popularity',
+        sort: 'desc',
+        limit: parseInt(limit, 10) || 24,
+        page: parseInt(page, 10) || 1,
       });
 
-      const raw = jikanRes.data?.data ?? [];
+      const raw = jikanRes?.data ?? [];
       // Adapt Jikan items to the same shape the frontend expects
       const adapted = raw.map(item => ({
         id: String(item.mal_id),
@@ -85,7 +81,7 @@ router.get('/manga/by-publisher', async (req, res) => {
         source: 'jikan',
       }));
 
-      return res.json({ data: adapted, total: jikanRes.data?.pagination?.items?.total ?? adapted.length });
+      return res.json({ data: adapted, total: jikanRes?.pagination?.items?.total ?? adapted.length });
     }
 
     if (q) {
@@ -104,8 +100,31 @@ router.get('/manga/by-publisher', async (req, res) => {
 
     return res.status(400).json({ error: 'Provide either magazines or q parameter' });
   } catch (err) {
-    console.error('Error in by-publisher route:', err.message, err.response?.data ?? '');
-    res.status(500).json({ error: 'Failed to fetch publisher manga', detail: err.message });
+    console.error('Error in by-publisher route, using mock fallback:', err.message);
+    
+    // Provide a robust mock data fallback to prevent the publisher page from showing "Offline Mode"
+    try {
+      const limitNum = parseInt(limit, 10) || 24;
+      const pageNum = parseInt(page, 10) || 1;
+      const startIndex = (pageNum - 1) * limitNum;
+      
+      const slice = mockMangaData.slice(startIndex, startIndex + limitNum).map(item => ({
+        ...item,
+        id: String(item.mal_id),
+        imageUrl: item.images?.jpg?.large_image_url || item.images?.jpg?.image_url,
+        source: 'local'
+      }));
+
+      return res.json({
+        data: slice,
+        total: mockMangaData.length,
+        source: 'local_fallback',
+        warning: 'Jikan API offline or blocked. Showing cached local library.'
+      });
+    } catch (fallbackErr) {
+      console.error('Fallback failed too:', fallbackErr.message);
+      res.status(500).json({ error: 'Failed to fetch publisher manga', detail: err.message });
+    }
   }
 });
 
