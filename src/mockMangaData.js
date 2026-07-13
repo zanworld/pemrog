@@ -13,8 +13,8 @@ export const mockMangaData = [
     type: "Manhwa",
     images: {
       jpg: {
-        large_image_url: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500&auto=format&fit=crop&q=80",
-        image_url: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300&auto=format&fit=crop&q=80"
+        large_image_url: "https://upload.wikimedia.org/wikipedia/en/6/6c/Solo_Leveling_Volume_1_Cover.jpg",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/6/6c/Solo_Leveling_Volume_1_Cover.jpg"
       }
     },
     genres: [
@@ -44,8 +44,8 @@ export const mockMangaData = [
     type: "Manga",
     images: {
       jpg: {
-        large_image_url: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&auto=format&fit=crop&q=80",
-        image_url: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=300&auto=format&fit=crop&q=80"
+        large_image_url: "https://upload.wikimedia.org/wikipedia/en/4/4a/Berserk_vol01.png",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/4/4a/Berserk_vol01.png"
       }
     },
     genres: [
@@ -75,8 +75,8 @@ export const mockMangaData = [
     type: "Manga",
     images: {
       jpg: {
-        large_image_url: "https://images.unsplash.com/photo-1560942485-b2a11cc13456?w=500&auto=format&fit=crop&q=80",
-        image_url: "https://images.unsplash.com/photo-1560942485-b2a11cc13456?w=300&auto=format&fit=crop&q=80"
+        large_image_url: "https://upload.wikimedia.org/wikipedia/en/9/90/One_Piece%2C_Volume_61_Cover_%28Japanese%29.jpg",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/9/90/One_Piece%2C_Volume_61_Cover_%28Japanese%29.jpg"
       }
     },
     genres: [
@@ -106,8 +106,8 @@ export const mockMangaData = [
     type: "Manga",
     images: {
       jpg: {
-        large_image_url: "https://images.unsplash.com/photo-1580477667995-2b94f01c9516?w=500&auto=format&fit=crop&q=80",
-        image_url: "https://images.unsplash.com/photo-1580477667995-2b94f01c9516?w=300&auto=format&fit=crop&q=80"
+        large_image_url: "https://upload.wikimedia.org/wikipedia/en/0/00/Monster_manga_volume_1_cover.jpg",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/0/00/Monster_manga_volume_1_cover.jpg"
       }
     },
     genres: [
@@ -137,8 +137,8 @@ export const mockMangaData = [
     type: "Manga",
     images: {
       jpg: {
-        large_image_url: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500&auto=format&fit=crop&q=80",
-        image_url: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=300&auto=format&fit=crop&q=80"
+        large_image_url: "https://upload.wikimedia.org/wikipedia/en/6/60/Frieren_Beyond_Journey%27s_End.jpg",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/6/60/Frieren_Beyond_Journey%27s_End.jpg"
       }
     },
     genres: [
@@ -168,8 +168,8 @@ export const mockMangaData = [
     type: "Manga",
     images: {
       jpg: {
-        large_image_url: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=500&auto=format&fit=crop&q=80",
-        image_url: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=300&auto=format&fit=crop&q=80"
+        large_image_url: "https://upload.wikimedia.org/wikipedia/en/2/24/Chainsawman.jpg",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/2/24/Chainsawman.jpg"
       }
     },
     genres: [
@@ -199,8 +199,8 @@ export const mockMangaData = [
     type: "Manga",
     images: {
       jpg: {
-        large_image_url: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&auto=format&fit=crop&q=80",
-        image_url: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=300&auto=format&fit=crop&q=80"
+        large_image_url: "https://upload.wikimedia.org/wikipedia/en/8/86/Kaguya-sama_-_Love_is_War%2C_volume_1.jpg",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/8/86/Kaguya-sama_-_Love_is_War%2C_volume_1.jpg"
       }
     },
     genres: [
@@ -229,8 +229,8 @@ export const mockMangaData = [
     type: "Manga",
     images: {
       jpg: {
-        large_image_url: "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=500&auto=format&fit=crop&q=80",
-        image_url: "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=300&auto=format&fit=crop&q=80"
+        large_image_url: "https://upload.wikimedia.org/wikipedia/en/e/e4/Grand_Blue_volume_1_cover.jpg",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/e/e4/Grand_Blue_volume_1_cover.jpg"
       }
     },
     genres: [
@@ -259,8 +259,8 @@ export const mockMangaData = [
     type: "Manga",
     images: {
       jpg: {
-        large_image_url: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&auto=format&fit=crop&q=80",
-        image_url: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=300&auto=format&fit=crop&q=80"
+        large_image_url: "https://upload.wikimedia.org/wikipedia/en/e/e4/Steins%3BGate_cover_art.jpg",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/e/e4/Steins%3BGate_cover_art.jpg"
       }
     },
     genres: [
@@ -290,8 +290,8 @@ export const mockMangaData = [
     type: "Manga",
     images: {
       jpg: {
-        large_image_url: "https://images.unsplash.com/photo-1613376023733-0a73315d9b06?w=500&auto=format&fit=crop&q=80",
-        image_url: "https://images.unsplash.com/photo-1613376023733-0a73315d9b06?w=300&auto=format&fit=crop&q=80"
+        large_image_url: "https://upload.wikimedia.org/wikipedia/en/a/ab/Vol1hori.jpg",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/a/ab/Vol1hori.jpg"
       }
     },
     genres: [
@@ -321,8 +321,8 @@ export const mockMangaData = [
     type: "Manga",
     images: {
       jpg: {
-        large_image_url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop&q=80",
-        image_url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=300&auto=format&fit=crop&q=80"
+        large_image_url: "https://upload.wikimedia.org/wikipedia/en/6/6f/Death_Note_Vol_1.jpg",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/6/6f/Death_Note_Vol_1.jpg"
       }
     },
     genres: [
@@ -351,8 +351,8 @@ export const mockMangaData = [
     type: "Manga",
     images: {
       jpg: {
-        large_image_url: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=500&auto=format&fit=crop&q=80",
-        image_url: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=300&auto=format&fit=crop&q=80"
+        large_image_url: "https://upload.wikimedia.org/wikipedia/en/0/01/Yotsuba%26-vol1cover-jp.png",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/0/01/Yotsuba%26-vol1cover-jp.png"
       }
     },
     genres: [

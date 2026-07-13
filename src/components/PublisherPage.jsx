@@ -38,8 +38,8 @@ export default function PublisherPage({ publisherId, favorites = [], onToggleFav
     try {
       let url;
       if (publisher.jikanIds) {
-        // JP publishers: use Jikan magazine filter via dedicated route
-        url = `/api/manga/by-publisher?magazines=${encodeURIComponent(publisher.jikanIds)}&limit=24&page=${page}`;
+        // JP publishers: dedicated route tries MangaDex (by name) first, then Jikan magazine filter
+        url = `/api/manga/by-publisher?magazines=${encodeURIComponent(publisher.jikanIds)}&name=${encodeURIComponent(publisher.name)}&limit=24&page=${page}`;
       } else if (publisher.q) {
         // EN publishers: keyword search (note: results are approximate, not a strict license filter)
         url = `/api/manga/by-publisher?q=${encodeURIComponent(publisher.q)}&limit=24&page=${page}`;

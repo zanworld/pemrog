@@ -4,7 +4,9 @@ const MANGADEX_BASE_URL = 'https://api.mangadex.org';
 
 const client = axios.create({
   baseURL: MANGADEX_BASE_URL,
-  timeout: 8000,
+  // Kept short — this is tried before Jikan in some fallback chains (e.g. by-publisher),
+  // so it must not consume most of the serverless function's execution budget by itself.
+  timeout: 4000,
 });
 
 // ── Genre Tag Cache ───────────────────────────────────────────

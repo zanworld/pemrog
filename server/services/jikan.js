@@ -4,7 +4,10 @@ const BASE_URL = 'https://api.jikan.moe/v4';
 
 const client = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000,
+  // Kept short (not 15s) because this call sits inside a serverless function with a hard
+  // execution ceiling (Vercel kills the whole function around ~10s on the default tier) —
+  // a single hung attempt must not by itself burn the entire request budget.
+  timeout: 5000,
 });
 
 // Simple in-memory cache
@@ -14,7 +17,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 // Helper to delay execution
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function fetchWithCacheAndRetry(url, config = {}, retries = 3, delayMs = 1000) {
+async function fetchWithCacheAndRetry(url, config = {}, retries = 2, delayMs = 500) {
   const cacheKey = url + JSON.stringify(config.params || {});
 
   // Check cache
@@ -32,14 +35,23 @@ async function fetchWithCacheAndRetry(url, config = {}, retries = 3, delayMs = 1
       timestamp: Date.now(),
       data: response.data,
     });
-    
+
     // Slight delay after successful request to be nice to the API
-    await sleep(350); 
-    
+    await sleep(350);
+
     return response.data;
   } catch (error) {
-    if (error.response && error.response.status === 429 && retries > 0) {
-      console.warn(`Jikan API rate limited on ${url}, retrying in ${delayMs}ms...`);
+    const status = error.response?.status;
+    // Retry on rate limiting (429) and transient upstream/gateway errors (502/503/504 —
+    // Jikan itself proxies MyAnimeList and returns 504 when MAL is briefly unreachable).
+    // These are cheap to retry because a response came back promptly.
+    // Deliberately do NOT retry when there's no response at all (timeout/DNS/connection
+    // reset) — that means the request already spent up to the full client timeout hanging,
+    // and retrying would risk exceeding the serverless function's own execution limit.
+    // Let the caller's next fallback tier (MangaDex/mock) take over immediately instead.
+    const isRetryable = status === 429 || status === 502 || status === 503 || status === 504;
+    if (isRetryable && retries > 0) {
+      console.warn(`Jikan API request failed (${status}) on ${url}, retrying in ${delayMs}ms... (${retries} retries left)`);
       await sleep(delayMs);
       return fetchWithCacheAndRetry(url, config, retries - 1, delayMs * 2);
     }

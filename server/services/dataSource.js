@@ -18,7 +18,7 @@ const getMockMangaByUuid = (uuid) => {
 
 // ── ADAPTERS ──────────────────────────────────────────────────
 
-const adaptMangaDex = (item) => {
+export const adaptMangaDex = (item) => {
   const coverRel = item.relationships?.find(r => r.type === 'cover_art');
   const fileName = coverRel?.attributes?.fileName;
   const rawImageUrl = fileName
