@@ -182,7 +182,7 @@ export default function ReadingHistoryPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       if (entry.chapter_id) {
-                        navigate(`/read/${entry.chapter_id}?page=${entry.last_page || 1}`);
+                        navigate(`/read/${mangaId}?chapter=${entry.chapter_id}`);
                       }
                     }}
                     className="flex items-center gap-1 text-[11px] font-semibold text-brand-orange hover:text-brand-accent transition-colors"

@@ -49,15 +49,16 @@ export default function MangaDetailModal({ manga, onClose, isFavorite, onToggleF
         .then(res => res.json())
         .then(data => {
           const count = data.total || (data.data ? data.data.length : 0);
-          if (count > 0) {
-            setChapterCount(count);
-          }
+          setChapterCount(count || 0);
         })
-        .catch(err => console.warn('Failed to fetch chapters for modal:', err));
+        .catch(err => {
+          console.warn('Failed to fetch chapters for modal:', err);
+          setChapterCount(0);
+        });
     }
   }, [manga.id, manga.mal_id, manga.source, manga.chapters]);
 
-  const chaptersDisplay = manga.chapters || (chapterCount ? `${chapterCount}+` : 'Unknown');
+  const chaptersDisplay = manga.chapters || (chapterCount !== null ? `${chapterCount}+` : 'Loading...');
 
   const handleReadLater = () => {
     if (inReadLater) {

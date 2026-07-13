@@ -126,6 +126,7 @@ export const searchManga = async (query = '', limit = 12, page = 1, genres = '',
     }
     if (excludedIds.length > 0) {
       params['excludedTags[]'] = excludedIds;
+      params.excludedTagsMode = 'or';
     }
   }
 

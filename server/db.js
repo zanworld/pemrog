@@ -127,4 +127,22 @@ export const initDB = () => {
   }
 };
 
+export const runWithRetry = async (fn, maxRetries = 2, delay = 100) => {
+  let attempt = 0;
+  while (true) {
+    try {
+      return fn();
+    } catch (error) {
+      attempt++;
+      console.warn(`[DB Attempt ${attempt}] Error: ${error.message} (code: ${error.code})`);
+      if (error.code === 'SQLITE_BUSY' && attempt <= maxRetries) {
+        console.warn(`Database busy. Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+};
+
 export default db;

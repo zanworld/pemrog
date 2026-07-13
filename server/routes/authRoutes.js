@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import db from '../db.js';
+import db, { runWithRetry } from '../db.js';
 import { restoreUserIfMissing } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -102,11 +102,11 @@ router.patch('/profile', (req, res) => {
   }
 
   try {
-    // Reuse restoreUserIfMissing function from auth middleware
-    restoreUserIfMissing(userId, name.trim(), decoded.email);
-
-    // Update display name in SQLite
-    db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name.trim(), userId);
+    // Reuse restoreUserIfMissing function from auth middleware and update name with retry
+    await runWithRetry(() => {
+      restoreUserIfMissing(userId, name.trim(), decoded.email);
+      db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name.trim(), userId);
+    });
     
     // Fetch updated details to generate new JWT token
     const user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(userId);

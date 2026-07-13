@@ -25,15 +25,16 @@ export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClick
         .then(res => res.json())
         .then(data => {
           const count = data.total || (data.data ? data.data.length : 0);
-          if (count > 0) {
-            setChapterCount(count);
-          }
+          setChapterCount(count || 0);
         })
-        .catch(err => console.warn('Failed to fetch chapters for card:', err));
+        .catch(err => {
+          console.warn('Failed to fetch chapters for card:', err);
+          setChapterCount(0);
+        });
     }
   }, [manga.id, manga.mal_id, manga.source, manga.chapters]);
 
-  const chaptersDisplay = manga.chapters || (chapterCount ? `${chapterCount}+` : '?');
+  const chaptersDisplay = manga.chapters || (chapterCount !== null ? `${chapterCount}+` : 'Loading...');
 
   const handleFavoriteClick = (e) => {
     e.stopPropagation();
@@ -69,7 +70,7 @@ export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClick
         <div className="absolute inset-0 bg-gradient-to-t from-brand-darkBg via-transparent to-transparent opacity-60 transition-opacity duration-300 group-hover:opacity-85" />
 
         {/* Rating/Score Badge */}
-        {manga.source !== 'mangadex' && score !== 'N/A' && (
+        {score && score !== 'N/A' && (
           <div className="absolute left-3 top-3 flex items-center gap-1 rounded-lg bg-brand-darkBg/95 px-2.5 py-1 text-xs font-bold text-brand-orange border border-brand-orange/20 shadow-sm">
             <Star className="h-3.5 w-3.5 fill-brand-orange text-brand-orange" />
             <span>{score}</span>
@@ -134,7 +135,9 @@ export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClick
         <div className="mt-auto pt-3 flex items-center justify-between text-xs text-brand-textMuted border-t border-brand-border/40">
           <span className="flex items-center gap-1">
             <Bookmark className="h-3.5 w-3.5 text-brand-orange" />
-            <span>{chaptersDisplay} Chapters</span>
+            <span>
+              {chaptersDisplay === 'Loading...' ? chaptersDisplay : `${chaptersDisplay} Chapters`}
+            </span>
           </span>
           <span className="font-semibold text-brand-orange group-hover:text-brand-accent transition-colors duration-200">
             Show Info →

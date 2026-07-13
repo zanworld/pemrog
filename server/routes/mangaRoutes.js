@@ -39,74 +39,92 @@ router.get('/manga/genres', async (req, res) => {
 });
 
 // GET /api/manga/by-publisher?magazines=8,87,88,113  OR  ?q=viz&limit=24&page=1
-// Serves local mock data filtered by publisher
+// For JP publishers (magazines param): proxies directly to Jikan /manga?magazines=...
+// For EN publishers (q param): does a title/query search via dataSource (MangaDex-first)
 router.get('/manga/by-publisher', async (req, res) => {
   const { magazines, q, limit = 24, page = 1 } = req.query;
 
   try {
-    const limitNum = parseInt(limit, 10) || 24;
-    const pageNum = parseInt(page, 10) || 1;
-    const startIndex = (pageNum - 1) * limitNum;
-
-    let ids = [];
-
     if (magazines) {
-      const magList = magazines.split(',').map(id => id.trim());
-      if (magList.some(id => ['8', '87', '88', '113'].includes(id))) {
-        ids = [3, 6, 11]; // Shueisha -> One Piece, Chainsaw Man, Death Note
-      } else if (magList.some(id => ['83', '84', '65'].includes(id))) {
-        ids = [8]; // Kodansha -> Grand Blue
-      } else if (magList.some(id => ['82', '127'].includes(id))) {
-        ids = [5]; // Shogakukan -> Frieren
-      } else if (magList.some(id => ['100', '102', '103'].includes(id))) {
-        ids = [9]; // Kadokawa -> Steins;Gate
-      } else if (magList.some(id => ['13', '14'].includes(id))) {
-        ids = [10]; // Square Enix -> Horimiya
-      }
-    } else if (q) {
-      const query = q.toLowerCase().trim();
-      if (query.includes('viz')) {
-        ids = [3, 6, 11];
-      } else if (query.includes('yen')) {
-        ids = [5, 10];
-      } else if (query.includes('seven')) {
-        ids = [12, 1];
-      } else if (query.includes('dark')) {
-        ids = [2];
-      } else if (query.includes('vertical')) {
-        ids = [4];
-      } else {
-        // Fallback search match by title
-        const match = mockMangaData.filter(item => 
-          item.title.toLowerCase().includes(query) || 
-          (item.title_english && item.title_english.toLowerCase().includes(query))
-        );
-        ids = match.map(m => m.mal_id);
-      }
+      // Jikan expects array format: magazines[]=8&magazines[]=87...
+      // NOT a comma-separated string
+      const magazineIds = magazines.split(',').map(id => id.trim()).filter(Boolean);
+
+      const jikanRes = await jikan.searchManga({
+        'magazines[]': magazineIds,
+        order_by: 'popularity',
+        sort: 'desc',
+        limit: parseInt(limit, 10) || 24,
+        page: parseInt(page, 10) || 1,
+      });
+
+      const raw = jikanRes?.data ?? [];
+      // Adapt Jikan items to the same shape the frontend expects
+      const adapted = raw.map(item => ({
+        id: String(item.mal_id),
+        mal_id: item.mal_id,
+        title: item.title,
+        title_english: item.title_english,
+        synopsis: item.synopsis,
+        score: item.score,
+        rank: item.rank,
+        popularity: item.popularity,
+        status: item.status,
+        type: item.type,
+        chapters: item.chapters,
+        volumes: item.volumes,
+        images: item.images,
+        imageUrl: item.images?.jpg?.large_image_url || item.images?.jpg?.image_url,
+        genres: item.genres || [],
+        authors: (item.authors || []).map(a => ({ name: a.name })),
+        published: item.published,
+        source: 'jikan',
+      }));
+
+      return res.json({ data: adapted, total: jikanRes?.pagination?.items?.total ?? adapted.length });
     }
 
-    let filteredData = [];
-    if (ids.length > 0) {
-      filteredData = mockMangaData.filter(m => ids.includes(m.mal_id));
-    } else {
-      filteredData = mockMangaData;
+    if (q) {
+      // EN publishers — fallback to title search via regular dataSource
+      const result = await dataSource.searchManga(
+        q,
+        parseInt(limit, 10) || 24,
+        parseInt(page, 10) || 1,
+        '',    // no genre filter
+        '',    // no status filter
+        'popularity',
+        'desc'
+      );
+      return res.json(result);
     }
 
-    const slice = filteredData.slice(startIndex, startIndex + limitNum).map(item => ({
-      ...item,
-      id: String(item.mal_id),
-      imageUrl: item.images?.jpg?.large_image_url || item.images?.jpg?.image_url,
-      source: 'local'
-    }));
-
-    return res.json({
-      data: slice,
-      total: filteredData.length,
-      source: 'local'
-    });
+    return res.status(400).json({ error: 'Provide either magazines or q parameter' });
   } catch (err) {
-    console.error('Error in by-publisher route:', err.message);
-    res.status(500).json({ error: 'Failed to fetch publisher manga', detail: err.message });
+    console.error('Error in by-publisher route, using mock fallback:', err.message);
+    
+    // Provide a robust mock data fallback to prevent the publisher page from showing "Offline Mode"
+    try {
+      const limitNum = parseInt(limit, 10) || 24;
+      const pageNum = parseInt(page, 10) || 1;
+      const startIndex = (pageNum - 1) * limitNum;
+      
+      const slice = mockMangaData.slice(startIndex, startIndex + limitNum).map(item => ({
+        ...item,
+        id: String(item.mal_id),
+        imageUrl: item.images?.jpg?.large_image_url || item.images?.jpg?.image_url,
+        source: 'local'
+      }));
+
+      return res.json({
+        data: slice,
+        total: mockMangaData.length,
+        source: 'local_fallback',
+        warning: 'Jikan API offline or blocked. Showing cached local library.'
+      });
+    } catch (fallbackErr) {
+      console.error('Fallback failed too:', fallbackErr.message);
+      res.status(500).json({ error: 'Failed to fetch publisher manga', detail: err.message });
+    }
   }
 });
 

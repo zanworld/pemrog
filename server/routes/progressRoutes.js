@@ -1,5 +1,5 @@
 import express from 'express';
-import db from '../db.js';
+import db, { runWithRetry } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -34,25 +34,6 @@ router.get('/progress/:mangaId', authenticateToken, (req, res) => {
   }
 });
 
-const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-const runWithRetry = async (fn, maxRetries = 2, delay = 100) => {
-  let attempt = 0;
-  while (true) {
-    try {
-      return fn();
-    } catch (error) {
-      attempt++;
-      console.warn(`[DB Attempt ${attempt}] Error: ${error.message} (code: ${error.code})`);
-      if (error.code === 'SQLITE_BUSY' && attempt <= maxRetries) {
-        console.warn(`Database busy. Retrying in ${delay}ms...`);
-        await wait(delay);
-        continue;
-      }
-      throw error;
-    }
-  }
-};
 
 // POST /api/progress
 router.post('/progress', authenticateToken, async (req, res) => {
