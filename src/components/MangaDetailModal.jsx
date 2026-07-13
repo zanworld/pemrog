@@ -19,6 +19,24 @@ export default function MangaDetailModal({ manga, onClose, isFavorite, onToggleF
   const genres = manga.genres || [];
   const authors = manga.authors || [];
 
+  const [chapterCount, setChapterCount] = React.useState(null);
+
+  React.useEffect(() => {
+    if (manga.source === 'mangadex' && !manga.chapters) {
+      fetch(`/api/manga/${manga.id || manga.mal_id}/feed`)
+        .then(res => res.json())
+        .then(data => {
+          const count = data.total || (data.data ? data.data.length : 0);
+          if (count > 0) {
+            setChapterCount(count);
+          }
+        })
+        .catch(err => console.warn('Failed to fetch chapters for modal:', err));
+    }
+  }, [manga.id, manga.mal_id, manga.source, manga.chapters]);
+
+  const chaptersDisplay = manga.chapters || (chapterCount ? `${chapterCount}+` : 'Unknown');
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 overflow-y-auto">
       {/* Modal Container */}
@@ -86,31 +104,33 @@ export default function MangaDetailModal({ manga, onClose, isFavorite, onToggleF
               )}
 
               {/* Stats badges */}
-              <div className="flex flex-wrap gap-2.5 mb-6">
-                <button 
-                  onClick={() => onInteractiveFilter({ sortBy: 'score', query: '' })}
-                  className="flex items-center gap-1 bg-brand-cardBg hover:bg-brand-orange/10 hover:border-brand-orange/50 transition-colors cursor-pointer border border-brand-border px-3 py-1 rounded-lg text-xs group"
-                  title="Sort catalog by Highest Score"
-                >
-                  <Star className="h-3.5 w-3.5 fill-brand-orange text-brand-orange group-hover:animate-spin-slow" />
-                  <span className="font-bold group-hover:text-brand-orange">{score}</span>
-                </button>
-                <button 
-                  onClick={() => onInteractiveFilter({ sortBy: 'popularity', query: '' })}
-                  className="bg-brand-cardBg hover:bg-brand-orange/10 hover:border-brand-orange/50 transition-colors cursor-pointer border border-brand-border px-3 py-1 rounded-lg text-xs text-brand-textMuted group"
-                  title="Sort catalog by Popularity"
-                >
-                  Rank <span className="font-bold text-brand-orange group-hover:text-brand-accent">#{rank}</span>
-                </button>
-                <button 
-                  onClick={() => onInteractiveFilter({ sortBy: 'popularity', query: '' })}
-                  className="bg-brand-cardBg hover:bg-brand-orange/10 hover:border-brand-orange/50 transition-colors cursor-pointer border border-brand-border px-3 py-1 rounded-lg text-xs text-brand-textMuted group flex items-center gap-1"
-                  title="Sort catalog by Popularity"
-                >
-                  <TrendingUp className="h-3 w-3 text-brand-textMuted group-hover:text-brand-orange" />
-                  Popularity <span className="font-bold text-brand-orange group-hover:text-brand-accent">#{popularity}</span>
-                </button>
-              </div>
+              {manga.source !== 'mangadex' && (
+                <div className="flex flex-wrap gap-2.5 mb-6">
+                  <button 
+                    onClick={() => onInteractiveFilter({ sortBy: 'score', query: '' })}
+                    className="flex items-center gap-1 bg-brand-cardBg hover:bg-brand-orange/10 hover:border-brand-orange/50 transition-colors cursor-pointer border border-brand-border px-3 py-1 rounded-lg text-xs group"
+                    title="Sort catalog by Highest Score"
+                  >
+                    <Star className="h-3.5 w-3.5 fill-brand-orange text-brand-orange group-hover:animate-spin-slow" />
+                    <span className="font-bold group-hover:text-brand-orange">{score}</span>
+                  </button>
+                  <button 
+                    onClick={() => onInteractiveFilter({ sortBy: 'popularity', query: '' })}
+                    className="bg-brand-cardBg hover:bg-brand-orange/10 hover:border-brand-orange/50 transition-colors cursor-pointer border border-brand-border px-3 py-1 rounded-lg text-xs text-brand-textMuted group"
+                    title="Sort catalog by Popularity"
+                  >
+                    Rank <span className="font-bold text-brand-orange group-hover:text-brand-accent">#{rank}</span>
+                  </button>
+                  <button 
+                    onClick={() => onInteractiveFilter({ sortBy: 'popularity', query: '' })}
+                    className="bg-brand-cardBg hover:bg-brand-orange/10 hover:border-brand-orange/50 transition-colors cursor-pointer border border-brand-border px-3 py-1 rounded-lg text-xs text-brand-textMuted group flex items-center gap-1"
+                    title="Sort catalog by Popularity"
+                  >
+                    <TrendingUp className="h-3 w-3 text-brand-textMuted group-hover:text-brand-orange" />
+                    Popularity <span className="font-bold text-brand-orange group-hover:text-brand-accent">#{popularity}</span>
+                  </button>
+                </div>
+              )}
 
               {/* Quick Info Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3.5 gap-x-4 mb-6 text-xs border-t border-b border-brand-border/45 py-4">
@@ -129,7 +149,7 @@ export default function MangaDetailModal({ manga, onClose, isFavorite, onToggleF
                 <div className="flex items-center gap-2 text-brand-textMuted">
                   <BookOpenCheck className="h-4 w-4 text-brand-orange flex-shrink-0" />
                   <span>
-                    <strong>Chapters:</strong> {chapters} (Vol {volumes})
+                    <strong>Chapters:</strong> {chaptersDisplay} (Vol {volumes})
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-brand-textMuted">

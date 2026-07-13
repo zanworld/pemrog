@@ -21,8 +21,28 @@ router.get('/progress/:mangaId', authenticateToken, (req, res) => {
   }
 });
 
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const runWithRetry = async (fn, maxRetries = 2, delay = 100) => {
+  let attempt = 0;
+  while (true) {
+    try {
+      return fn();
+    } catch (error) {
+      attempt++;
+      console.warn(`[DB Attempt ${attempt}] Error: ${error.message} (code: ${error.code})`);
+      if (error.code === 'SQLITE_BUSY' && attempt <= maxRetries) {
+        console.warn(`Database busy. Retrying in ${delay}ms...`);
+        await wait(delay);
+        continue;
+      }
+      throw error;
+    }
+  }
+};
+
 // POST /api/progress
-router.post('/progress', authenticateToken, (req, res) => {
+router.post('/progress', authenticateToken, async (req, res) => {
   try {
     const { manga_id, chapter_id, last_page } = req.body;
     
@@ -30,20 +50,25 @@ router.post('/progress', authenticateToken, (req, res) => {
       return res.status(400).json({ success: false, message: 'manga_id dan chapter_id wajib diisi' });
     }
     
-    // Upsert reading progress
-    db.prepare(`
-      INSERT INTO reading_progress (user_id, manga_id, chapter_id, last_page, updated_at)
-      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(user_id, manga_id) DO UPDATE SET
-        chapter_id = excluded.chapter_id,
-        last_page = excluded.last_page,
-        updated_at = CURRENT_TIMESTAMP
-    `).run(req.user.id, manga_id, chapter_id, last_page || 1);
+    // Upsert reading progress with retry
+    await runWithRetry(() => {
+      db.prepare(`
+        INSERT INTO reading_progress (user_id, manga_id, chapter_id, last_page, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id, manga_id) DO UPDATE SET
+          chapter_id = excluded.chapter_id,
+          last_page = excluded.last_page,
+          updated_at = CURRENT_TIMESTAMP
+      `).run(req.user.id, String(manga_id), String(chapter_id), last_page || 1);
+    });
     
     res.json({ success: true, message: 'Progress baca berhasil disimpan' });
   } catch (error) {
     console.error('Error saving progress:', error);
-    res.status(500).json({ success: false, message: 'Gagal menyimpan progress baca' });
+    res.status(500).json({ 
+      success: false, 
+      message: `Gagal menyimpan progress baca: ${error.message || 'Error internal'} (code: ${error.code || 'UNKNOWN'})` 
+    });
   }
 });
 

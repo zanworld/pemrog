@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS bookmarks (
 CREATE TABLE IF NOT EXISTS reading_progress (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    manga_id INTEGER NOT NULL,
+    manga_id TEXT NOT NULL,
     chapter_id TEXT,
     last_page INTEGER,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

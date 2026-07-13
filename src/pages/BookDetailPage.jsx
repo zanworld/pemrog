@@ -210,12 +210,17 @@ export default function BookDetailPage() {
       try {
         const res = await getMangaFeed(id);
         if (res?.data) {
+          console.log(`[Task 1 Debug] Raw chapters from API for ${id}:`, res.data.length);
           const mapped = res.data.map(ch => ({
             id: ch.id,
             chapterNumber: ch.attributes?.chapter || '?',
             title: ch.attributes?.title || `Chapter ${ch.attributes?.chapter || '?'}`
           }));
+          console.log(`[Task 1 Debug] Mapped chapters count for ${id}:`, mapped.length);
           setChapters(mapped);
+        } else {
+          console.log(`[Task 1 Debug] No chapters data returned from API for ${id}`);
+          setChapters([]);
         }
       } catch (err) {
         console.error('Failed to fetch chapters:', err);
@@ -359,7 +364,7 @@ export default function BookDetailPage() {
   const score = manga.score ? manga.score.toFixed(1) : 'N/A';
   const rank = manga.rank || 'N/A';
   const popularity = manga.popularity || 'N/A';
-  const chaptersCount = manga.chapters || 'Unknown';
+  const chaptersCount = manga.chapters || (chapters && chapters.length > 0 ? `${chapters.length}+` : 'Unknown');
   const volumes = manga.volumes || 'Unknown';
   const status = manga.status || 'Unknown';
   const synopsis = manga.synopsis || 'No description available for this manga.';
@@ -505,23 +510,25 @@ export default function BookDetailPage() {
           <motion.div variants={childVariants} className="flex-1 min-w-0">
 
             {/* ─ Stat Badges ─ */}
-            <div className="flex flex-wrap gap-2.5 mb-6">
-              <div className="flex items-center gap-1.5 bg-brand-cardBg border border-brand-border px-3.5 py-1.5 rounded-lg text-xs group">
-                <Star className="h-3.5 w-3.5 fill-brand-orange text-brand-orange" />
-                <span className="font-bold text-brand-orange">{score}</span>
-                <span className="text-brand-textMuted">Score</span>
+            {manga.source !== 'mangadex' && (
+              <div className="flex flex-wrap gap-2.5 mb-6">
+                <div className="flex items-center gap-1.5 bg-brand-cardBg border border-brand-border px-3.5 py-1.5 rounded-lg text-xs group">
+                  <Star className="h-3.5 w-3.5 fill-brand-orange text-brand-orange" />
+                  <span className="font-bold text-brand-orange">{score}</span>
+                  <span className="text-brand-textMuted">Score</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-brand-cardBg border border-brand-border px-3.5 py-1.5 rounded-lg text-xs">
+                  <Hash className="h-3.5 w-3.5 text-brand-orange" />
+                  <span className="text-brand-textMuted">Rank</span>
+                  <span className="font-bold text-brand-orange">#{rank}</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-brand-cardBg border border-brand-border px-3.5 py-1.5 rounded-lg text-xs">
+                  <TrendingUp className="h-3.5 w-3.5 text-brand-orange" />
+                  <span className="text-brand-textMuted">Popularity</span>
+                  <span className="font-bold text-brand-orange">#{popularity}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 bg-brand-cardBg border border-brand-border px-3.5 py-1.5 rounded-lg text-xs">
-                <Hash className="h-3.5 w-3.5 text-brand-orange" />
-                <span className="text-brand-textMuted">Rank</span>
-                <span className="font-bold text-brand-orange">#{rank}</span>
-              </div>
-              <div className="flex items-center gap-1.5 bg-brand-cardBg border border-brand-border px-3.5 py-1.5 rounded-lg text-xs">
-                <TrendingUp className="h-3.5 w-3.5 text-brand-orange" />
-                <span className="text-brand-textMuted">Popularity</span>
-                <span className="font-bold text-brand-orange">#{popularity}</span>
-              </div>
-            </div>
+            )}
 
             {/* ─ Info Grid ─ */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3.5 gap-x-5 mb-6 border-t border-b border-brand-border/40 py-5">
@@ -653,7 +660,7 @@ export default function BookDetailPage() {
                       ))
                     ) : (
                       <p className="text-xs text-brand-textMuted col-span-full text-center py-8">
-                        {chaptersLoading ? 'Memuat daftar chapter...' : 'Daftar chapter tidak tersedia.'}
+                        {chaptersLoading ? 'Memuat daftar chapter...' : 'Belum ada chapter berbahasa Indonesia/Inggris untuk judul ini'}
                       </p>
                     )}
                   </motion.div>

@@ -10,11 +10,28 @@ export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClick
   const title = manga.title || manga.title_english || 'Unknown Title';
   const imageUrl = manga.images?.jpg?.large_image_url || manga.images?.jpg?.image_url || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=300&auto=format&fit=crop';
   const score = manga.score ? manga.score.toFixed(1) : 'N/A';
-  const chapters = manga.chapters || '?';
   const type = manga.type || 'Manga';
   
   // Extract main genres
   const genres = manga.genres?.slice(0, 2).map(g => g.name) || [];
+
+  const [chapterCount, setChapterCount] = React.useState(null);
+
+  React.useEffect(() => {
+    if (manga.source === 'mangadex' && !manga.chapters) {
+      fetch(`/api/manga/${manga.id || manga.mal_id}/feed`)
+        .then(res => res.json())
+        .then(data => {
+          const count = data.total || (data.data ? data.data.length : 0);
+          if (count > 0) {
+            setChapterCount(count);
+          }
+        })
+        .catch(err => console.warn('Failed to fetch chapters for card:', err));
+    }
+  }, [manga.id, manga.mal_id, manga.source, manga.chapters]);
+
+  const chaptersDisplay = manga.chapters || (chapterCount ? `${chapterCount}+` : '?');
 
   const handleFavoriteClick = (e) => {
     e.stopPropagation(); // Prevent opening modal
@@ -39,10 +56,12 @@ export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClick
         <div className="absolute inset-0 bg-gradient-to-t from-brand-darkBg via-transparent to-transparent opacity-60 transition-opacity duration-300 group-hover:opacity-85" />
 
         {/* Rating/Score Badge */}
-        <div className="absolute left-3 top-3 flex items-center gap-1 rounded-lg bg-brand-darkBg/95 px-2.5 py-1 text-xs font-bold text-brand-orange border border-brand-orange/20 shadow-sm">
-          <Star className="h-3.5 w-3.5 fill-brand-orange text-brand-orange" />
-          <span>{score}</span>
-        </div>
+        {manga.source !== 'mangadex' && score !== 'N/A' && (
+          <div className="absolute left-3 top-3 flex items-center gap-1 rounded-lg bg-brand-darkBg/95 px-2.5 py-1 text-xs font-bold text-brand-orange border border-brand-orange/20 shadow-sm">
+            <Star className="h-3.5 w-3.5 fill-brand-orange text-brand-orange" />
+            <span>{score}</span>
+          </div>
+        )}
 
         {/* Format Badge (Manga, Manhwa, etc) */}
         <div className="absolute right-3 top-3 rounded-lg bg-black/80 px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase text-brand-textMain border border-white/10">
@@ -89,7 +108,7 @@ export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClick
         <div className="mt-auto pt-3 flex items-center justify-between text-xs text-brand-textMuted border-t border-brand-border/40">
           <span className="flex items-center gap-1">
             <Bookmark className="h-3.5 w-3.5 text-brand-orange" />
-            <span>{chapters} Chapters</span>
+            <span>{chaptersDisplay} Chapters</span>
           </span>
           <span className="font-semibold text-brand-orange group-hover:text-brand-accent transition-colors duration-200">
             Show Info →

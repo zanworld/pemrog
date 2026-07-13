@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../db.js';
+import { restoreUserIfMissing } from '../middleware/auth.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-hybrid-library';
@@ -87,8 +88,9 @@ router.patch('/profile', (req, res) => {
   if (!token) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
   let userId;
+  let decoded;
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    decoded = jwt.verify(token, JWT_SECRET);
     userId = decoded.id;
   } catch {
     return res.status(401).json({ success: false, message: 'Invalid token' });
@@ -100,23 +102,26 @@ router.patch('/profile', (req, res) => {
   }
 
   try {
-    let user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(userId);
+    // Reuse restoreUserIfMissing function from auth middleware
+    restoreUserIfMissing(userId, name.trim(), decoded.email);
+
+    // Update display name in SQLite
+    db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name.trim(), userId);
+    
+    // Fetch updated details to generate new JWT token
+    const user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(userId);
     if (!user) {
-      // Re-create the user in this container's SQLite instance using JWT payload info
-      const decoded = jwt.decode(token);
-      db.prepare('INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)')
-        .run(userId, name.trim(), decoded.email || `user_${userId}@example.com`, 'restored-session-dummy-hash');
-      user = { id: userId, name: name.trim(), email: decoded.email || `user_${userId}@example.com` };
-    } else {
-      db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name.trim(), userId);
-      user.name = name.trim();
+      return res.status(404).json({ success: false, message: 'User tidak ditemukan setelah pemulihan database' });
     }
 
     const newToken = jwt.sign({ id: user.id, email: user.email, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ success: true, user, token: newToken });
   } catch (error) {
     console.error('Profile update error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ 
+      success: false, 
+      message: `Gagal memperbarui profil: ${error.message || 'Error internal'} (code: ${error.code || 'UNKNOWN'})` 
+    });
   }
 });
 

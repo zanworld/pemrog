@@ -13,6 +13,7 @@ import HeroCarousel from './components/HeroCarousel';
 import Footer from './components/Footer';
 import { mockMangaData } from './mockMangaData';
 import AppRouter from './Router';
+import ScrollToTop from './components/ScrollToTop';
 
 export default function App() {
   const location = useLocation();
@@ -333,6 +334,7 @@ export default function App() {
 
   return (
     <div className="h-screen flex overflow-hidden bg-brand-darkBg text-brand-textMain select-none transition-colors duration-300">
+      <ScrollToTop />
       <Toaster
         position="bottom-right"
         toastOptions={{
