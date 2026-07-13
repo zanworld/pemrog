@@ -20,7 +20,7 @@ export default function ReadOnlyPage() {
 
   // Toast current chapter
   useEffect(() => {
-    if (chapter) {
+    if (chapter && chapter !== '1') {
       toast.success(`Membaca Chapter ${chapter}`);
     }
   }, [chapter]);
@@ -46,11 +46,57 @@ export default function ReadOnlyPage() {
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [direction, setDirection] = useState(1);
 
+  const [chaptersList, setChaptersList] = useState([]);
+
   // Auto-hide controls
   const { isIdle, setIsIdle } = useIdleTimer(3000, showSettings || showThumbnails);
   const showControls = !isIdle || showSettings || showThumbnails;
 
   const verticalScrollRef = useRef(null);
+
+  // Fetch all chapters feed for this manga
+  useEffect(() => {
+    const fetchMangaChapters = async () => {
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/manga/${id}/feed`);
+        const data = await res.json();
+        if (data && data.data) {
+          const mapped = data.data.map(ch => ({
+            id: ch.id,
+            chapterNumber: ch.attributes?.chapter || '?',
+            title: ch.attributes?.title || `Chapter ${ch.attributes?.chapter || '?'}`
+          }));
+          // Sort chapters ascending by chapterNumber
+          mapped.sort((a, b) => {
+            const numA = parseFloat(a.chapterNumber);
+            const numB = parseFloat(b.chapterNumber);
+            if (isNaN(numA) || isNaN(numB)) return 0;
+            return numA - numB;
+          });
+          setChaptersList(mapped);
+        }
+      } catch (err) {
+        console.error('Failed to fetch manga chapters feed:', err);
+      }
+    };
+    fetchMangaChapters();
+  }, [id]);
+
+  // Redirect to first chapter (or last read chapter if saved) on mount
+  useEffect(() => {
+    if (chaptersList.length > 0 && (chapter === '1' || !chapter.includes('-'))) {
+      const savedLastChapter = localStorage.getItem(`progress_manga_${id}_last_chapter`);
+      const matchedSaved = savedLastChapter && chaptersList.some(ch => ch.id === savedLastChapter);
+      const targetChapterId = matchedSaved ? savedLastChapter : chaptersList[0]?.id;
+      
+      if (targetChapterId) {
+        navigate(`/read/${id}?chapter=${targetChapterId}`, { replace: true });
+      }
+    }
+  }, [chaptersList, chapter, id, navigate]);
+
+  const currentChapterIndex = chaptersList.findIndex(ch => ch.id === chapter);
 
   // Fetch initial progress
   useEffect(() => {
@@ -58,7 +104,7 @@ export default function ReadOnlyPage() {
       const localKey = `progress_manga_${id}_${chapter}`;
       const localSaved = localStorage.getItem(localKey);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('hybrid_library_token') || localStorage.getItem('token');
       if (token && id) {
         try {
           const res = await fetch(`/api/progress/${id}`, {
@@ -89,8 +135,9 @@ export default function ReadOnlyPage() {
       
       const localKey = `progress_manga_${id}_${chapter}`;
       localStorage.setItem(localKey, currentPage.toString());
+      localStorage.setItem(`progress_manga_${id}_last_chapter`, chapter);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('hybrid_library_token') || localStorage.getItem('token');
       if (!token) return;
       try {
         await fetch('/api/progress', {
@@ -109,15 +156,17 @@ export default function ReadOnlyPage() {
 
   // Fetch Chapter Pages
   const fetchPages = useCallback(async () => {
-    if (!chapter) return;
+    if (!chapter || chapter === '1') return;
     setIsLoading(true);
     try {
       const res = await fetch(`/api/chapter/${chapter}/pages`);
       const data = await res.json();
+      console.log('fetchPages response:', data);
       if (data.success && data.data && data.data.length > 0) {
         setDataPages(data.data);
         setDataSaverPages(data.dataSaver || data.data);
         setTotalPages(data.total || data.data.length);
+        console.log('setTotalPages called with:', data.total || data.data.length);
       } else {
         toast.error('Gagal mengambil halaman manga, memuat halaman contoh');
         setDataPages(samplePages);
@@ -160,23 +209,37 @@ export default function ReadOnlyPage() {
   const handlePrev = useCallback((e) => {
     if (e) e.stopPropagation();
     if (currentPage === 1) {
-      toast('Memuat Chapter Sebelumnya...', { icon: '⏮️' });
+      if (chaptersList.length > 0 && currentChapterIndex > 0) {
+        const prevChapter = chaptersList[currentChapterIndex - 1];
+        toast.success(`Memuat Chapter ${prevChapter.chapterNumber}...`, { icon: '⏮️' });
+        navigate(`/read/${id}?chapter=${prevChapter.id}`);
+        setCurrentPage(1);
+      } else {
+        toast('Ini adalah chapter pertama', { icon: '⏮️' });
+      }
       return;
     }
     const step = readMode === 'double' ? 2 : 1;
     goToPage(Math.max(1, currentPage - step));
-  }, [currentPage, goToPage, readMode]);
+  }, [currentPage, goToPage, readMode, chaptersList, currentChapterIndex, id, navigate]);
 
   const handleNext = useCallback((e) => {
     if (e) e.stopPropagation();
     const isLastBoundary = readMode === 'double' ? currentPage >= totalPages - 1 : currentPage === totalPages;
     if (isLastBoundary) {
-      toast('Memuat Chapter Selanjutnya...', { icon: '⏭️' });
+      if (chaptersList.length > 0 && currentChapterIndex !== -1 && currentChapterIndex < chaptersList.length - 1) {
+        const nextChapter = chaptersList[currentChapterIndex + 1];
+        toast.success(`Memuat Chapter ${nextChapter.chapterNumber}...`, { icon: '⏭️' });
+        navigate(`/read/${id}?chapter=${nextChapter.id}`);
+        setCurrentPage(1);
+      } else {
+        toast('Ini adalah chapter terakhir', { icon: '⏭️' });
+      }
       return;
     }
     const step = readMode === 'double' ? 2 : 1;
     goToPage(Math.min(totalPages, currentPage + step));
-  }, [currentPage, goToPage, readMode, totalPages]);
+  }, [currentPage, goToPage, readMode, totalPages, chaptersList, currentChapterIndex, id, navigate]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -268,7 +331,17 @@ export default function ReadOnlyPage() {
         >
           <div className="flex flex-col items-center gap-4 w-full max-w-4xl" style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', transition: 'transform 0.2s' }}>
             <button 
-              onClick={(e) => { e.stopPropagation(); toast('Memuat Chapter Sebelumnya...', { icon: '⏮️' }); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (chaptersList.length > 0 && currentChapterIndex > 0) {
+                  const prevChapter = chaptersList[currentChapterIndex - 1];
+                  toast.success(`Memuat Chapter ${prevChapter.chapterNumber}...`, { icon: '⏮️' });
+                  navigate(`/read/${id}?chapter=${prevChapter.id}`);
+                  setCurrentPage(1);
+                } else {
+                  toast('Ini adalah chapter pertama', { icon: '⏮️' });
+                }
+              }}
               className="py-4 px-8 bg-white/5 hover:bg-white/10 rounded-full font-bold text-sm mb-4 transition-colors"
             >
               Chapter Sebelumnya
@@ -290,7 +363,17 @@ export default function ReadOnlyPage() {
             ))}
 
             <button 
-              onClick={(e) => { e.stopPropagation(); toast('Memuat Chapter Selanjutnya...', { icon: '⏭️' }); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (chaptersList.length > 0 && currentChapterIndex !== -1 && currentChapterIndex < chaptersList.length - 1) {
+                  const nextChapter = chaptersList[currentChapterIndex + 1];
+                  toast.success(`Memuat Chapter ${nextChapter.chapterNumber}...`, { icon: '⏭️' });
+                  navigate(`/read/${id}?chapter=${nextChapter.id}`);
+                  setCurrentPage(1);
+                } else {
+                  toast('Ini adalah chapter terakhir', { icon: '⏭️' });
+                }
+              }}
               className="py-4 px-8 bg-brand-orange/20 hover:bg-brand-orange/40 text-brand-orange rounded-full font-bold text-sm mt-4 transition-colors"
             >
               Chapter Selanjutnya

@@ -446,7 +446,10 @@ export default function BookDetailPage() {
             <div className="mt-5 flex flex-col gap-2.5">
               {/* Read Online */}
               <button
-                onClick={() => navigate(`/read/${manga.id || manga.mal_id}`)}
+                onClick={() => {
+                  const firstChapterId = chapters[0]?.id || '1';
+                  navigate(`/read/${manga.id || manga.mal_id}?chapter=${firstChapterId}`);
+                }}
                 className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold bg-brand-orange hover:bg-brand-accent text-white shadow-neon hover:shadow-neon-hover transition-all duration-200 group cursor-pointer"
               >
                 <BookOpen className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" />
@@ -637,7 +640,7 @@ export default function BookDetailPage() {
                       chapters.map((ch) => (
                         <button
                           key={ch.id}
-                          onClick={() => navigate(`/read/${ch.id}`)}
+                          onClick={() => navigate(`/read/${id}?chapter=${ch.id}`)}
                           className="flex flex-col items-start p-3 bg-brand-cardBg/65 border border-brand-border/45 hover:border-brand-orange/50 hover:bg-brand-orange/5 hover:shadow-sm rounded-xl transition-all text-left group cursor-pointer w-full overflow-hidden"
                         >
                           <span className="text-xs font-bold text-brand-textMain group-hover:text-brand-orange transition-colors">
