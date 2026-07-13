@@ -82,7 +82,7 @@ router.post('/login', (req, res) => {
 });
 
 // Update Display Name
-router.patch('/profile', (req, res) => {
+router.patch('/profile', async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) return res.status(401).json({ success: false, message: 'Unauthorized' });
