@@ -24,6 +24,7 @@ export default function PublisherPage({ publisherId, favorites = [], onToggleFav
   const [error, setError] = useState(null);
   const [selectedManga, setSelectedManga] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [lastVisiblePage, setLastVisiblePage] = useState(10);
 
   // Reset to page 1 when publisher changes
   useEffect(() => {
@@ -52,6 +53,19 @@ export default function PublisherPage({ publisherId, favorites = [], onToggleFav
         // Enforce uniqueness to prevent Jikan API duplicates
         const uniqueData = res.data.data.filter((v, i, a) => a.findIndex(v2 => (v2.id === v.id)) === i);
         setMangaList(uniqueData);
+
+        if (res.data.degraded) {
+          setError(res.data.warning || 'Sedang menampilkan data contoh — API eksternal sedang gangguan.');
+        } else {
+          setError(null);
+        }
+
+        // Different branches of by-publisher shape pagination info differently
+        // (flat `total` for the magazines/mangadex/jikan branches, nested
+        // `pagination.last_visible_page` when it passes through dataSource.searchManga
+        // for the q= EN-publisher branch) — check both so the button count is always real.
+        const total = res.data.pagination?.items?.total ?? res.data.total ?? uniqueData.length;
+        setLastVisiblePage(res.data.pagination?.last_visible_page || Math.max(1, Math.ceil(total / 24)));
       } else {
         throw new Error('Empty response');
       }
@@ -118,51 +132,57 @@ export default function PublisherPage({ publisherId, favorites = [], onToggleFav
         onClickCard={setSelectedManga}
       />
 
-      {/* Pagination Controls */}
-      <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-12 mb-4">
-        <button 
-          onClick={() => {
-            setCurrentPage(Math.max(1, currentPage - 1));
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          disabled={currentPage === 1}
-          className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold"
-        >
-          &lt;
-        </button>
-        
-        {[...Array(10)].map((_, i) => {
-          const pageNum = i + 1;
-          const isActive = currentPage === pageNum;
-          return (
+      {/* Pagination Controls — capped at the real last_visible_page so users are never
+          sent to a page the backend already told us is empty. */}
+      {(() => {
+        const visiblePageCount = Math.max(1, Math.min(lastVisiblePage, 10));
+        return (
+          <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-12 mb-4">
             <button
-              key={pageNum}
               onClick={() => {
-                setCurrentPage(pageNum);
+                setCurrentPage(Math.max(1, currentPage - 1));
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className={`flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border text-xs sm:text-sm font-bold transition-all ${
-                isActive 
-                  ? 'border-brand-orange bg-brand-orange text-white shadow-neon scale-110 z-10' 
-                  : 'border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange'
-              }`}
+              disabled={currentPage === 1}
+              className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold"
             >
-              {pageNum}
+              &lt;
             </button>
-          );
-        })}
 
-        <button 
-          onClick={() => {
-            setCurrentPage(Math.min(10, currentPage + 1));
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          disabled={currentPage === 10}
-          className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold"
-        >
-          &gt;
-        </button>
-      </div>
+            {[...Array(visiblePageCount)].map((_, i) => {
+              const pageNum = i + 1;
+              const isActive = currentPage === pageNum;
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => {
+                    setCurrentPage(pageNum);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className={`flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border text-xs sm:text-sm font-bold transition-all ${
+                    isActive
+                      ? 'border-brand-orange bg-brand-orange text-white shadow-neon scale-110 z-10'
+                      : 'border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+
+            <button
+              onClick={() => {
+                setCurrentPage(Math.min(visiblePageCount, currentPage + 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              disabled={currentPage >= visiblePageCount}
+              className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold"
+            >
+              &gt;
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Detail Modal */}
       {selectedManga && (

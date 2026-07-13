@@ -143,6 +143,7 @@ router.get('/manga/by-publisher', async (req, res) => {
         data: slice,
         total: mockMangaData.length,
         source: 'local_fallback',
+        degraded: true,
         warning: 'Live manga sources (MangaDex, Jikan) are unreachable. Showing cached local library.'
       });
     } catch (fallbackErr) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Sparkles, AlertTriangle, HelpCircle, Heart, Layers } from 'lucide-react';
+import { Sparkles, AlertTriangle, HelpCircle, Heart, Layers, RefreshCw } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -27,6 +27,8 @@ export default function App() {
   const [mangaList, setMangaList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [degradedWarning, setDegradedWarning] = useState(null);
+  const [lastVisiblePage, setLastVisiblePage] = useState(10);
 
   // Favorites State (persisted in LocalStorage)
   const [favorites, setFavorites] = useState(() => {
@@ -150,12 +152,18 @@ export default function App() {
         // Enforce uniqueness to prevent Jikan API duplicates
         const uniqueData = response.data.data.filter((v, i, a) => a.findIndex(v2 => (v2.id === v.id)) === i);
         setMangaList(uniqueData);
+        setError(null);
+        setDegradedWarning(response.data.degraded ? (response.data.warning || 'Sedang menampilkan data contoh — API eksternal sedang gangguan.') : null);
+
+        const total = response.data.pagination?.items?.total ?? uniqueData.length;
+        setLastVisiblePage(response.data.pagination?.last_visible_page || Math.max(1, Math.ceil(total / 24)));
       } else {
         throw new Error("Response empty or invalid");
       }
     } catch (err) {
       console.warn("Backend API error.", err);
       setError("Unable to connect to the backend database.");
+      setDegradedWarning(null);
     } finally {
       setIsLoading(false);
     }
@@ -222,6 +230,20 @@ export default function App() {
         onSearchSubmit={handleSearchSubmit}
       />
 
+      {/* Degraded / Error Banner */}
+      {(error || degradedWarning) && (
+        <div className="mt-6 flex items-start gap-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 p-4 text-sm text-amber-200">
+          <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="font-bold">{error ? 'Connection Error' : 'Sedang Menampilkan Data Contoh'}</h4>
+            <p className="text-xs text-amber-200/80 mt-1">{error || degradedWarning}</p>
+          </div>
+          <button onClick={() => fetchMangaData()} className="flex items-center gap-1.5 text-xs text-brand-orange hover:underline font-semibold">
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </button>
+        </div>
+      )}
+
       <div className="mt-8">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-bold tracking-wide">
@@ -236,41 +258,47 @@ export default function App() {
           onClickCard={setSelectedManga}
         />
 
-        {/* Pagination Controls */}
-        <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-12 mb-4">
-          <button
-            onClick={() => handleInteractiveFilter({ page: Math.max(1, (filters.page || 1) - 1) })}
-            disabled={(filters.page || 1) === 1}
-            className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold"
-          >
-            &lt;
-          </button>
-
-          {[...Array(10)].map((_, i) => {
-            const pageNum = i + 1;
-            const isActive = (filters.page || 1) === pageNum;
-            return (
+        {/* Pagination Controls — capped at the real last_visible_page so users are never
+            sent to a page the backend already told us is empty. */}
+        {(() => {
+          const visiblePageCount = Math.max(1, Math.min(lastVisiblePage, 10));
+          return (
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-12 mb-4">
               <button
-                key={pageNum}
-                onClick={() => handleInteractiveFilter({ page: pageNum })}
-                className={`flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border text-xs sm:text-sm font-bold transition-all ${isActive
-                  ? 'border-brand-orange bg-brand-orange text-white shadow-neon scale-110 z-10'
-                  : 'border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange'
-                  }`}
+                onClick={() => handleInteractiveFilter({ page: Math.max(1, (filters.page || 1) - 1) })}
+                disabled={(filters.page || 1) === 1}
+                className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold"
               >
-                {pageNum}
+                &lt;
               </button>
-            );
-          })}
 
-          <button
-            onClick={() => handleInteractiveFilter({ page: Math.min(10, (filters.page || 1) + 1) })}
-            disabled={(filters.page || 1) === 10}
-            className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold"
-          >
-            &gt;
-          </button>
-        </div>
+              {[...Array(visiblePageCount)].map((_, i) => {
+                const pageNum = i + 1;
+                const isActive = (filters.page || 1) === pageNum;
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => handleInteractiveFilter({ page: pageNum })}
+                    className={`flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border text-xs sm:text-sm font-bold transition-all ${isActive
+                      ? 'border-brand-orange bg-brand-orange text-white shadow-neon scale-110 z-10'
+                      : 'border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange'
+                      }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              <button
+                onClick={() => handleInteractiveFilter({ page: Math.min(visiblePageCount, (filters.page || 1) + 1) })}
+                disabled={(filters.page || 1) >= visiblePageCount}
+                className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-brand-border bg-brand-cardBg text-brand-textMuted hover:text-brand-orange hover:border-brand-orange disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold"
+              >
+                &gt;
+              </button>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

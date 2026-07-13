@@ -128,7 +128,10 @@ export const searchManga = async (query = '', limit = 12, page = 1, genres = '',
     }
     if (excludedIds.length > 0) {
       params['excludedTags[]'] = excludedIds;
-      params.excludedTagsMode = 'or';
+      // MangaDex validates this as a case-sensitive enum ("AND"/"OR") — lowercase was
+      // silently rejected with a 400, which is why every sfw=true search (Catalog's
+      // default) fell straight past MangaDex to Jikan/mock even when MangaDex was healthy.
+      params.excludedTagsMode = 'OR';
     }
   }
 

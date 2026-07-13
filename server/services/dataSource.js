@@ -268,7 +268,9 @@ export const searchManga = async (query = '', limit = 12, page = 1, genres = '',
         per_page: limit
       }
     },
-    source: 'local'
+    source: 'local',
+    degraded: true,
+    warning: 'Live manga sources (MangaDex, Jikan) are unreachable. Showing cached local library.'
   };
 };
 

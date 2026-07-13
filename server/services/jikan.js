@@ -17,6 +17,13 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 // Helper to delay execution
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Short "circuit breaker": once a live attempt fails outright, skip trying Jikan again
+// for a short cooldown window instead of repeating the same failed round-trip on every
+// subsequent request during an outage. Lives for as long as this lambda instance is warm —
+// it's a best-effort optimization, not a cross-instance guarantee.
+let jikanDownUntil = 0;
+const DOWN_COOLDOWN_MS = 30 * 1000;
+
 async function fetchWithCacheAndRetry(url, config = {}, retries = 2, delayMs = 500) {
   const cacheKey = url + JSON.stringify(config.params || {});
 
@@ -28,6 +35,10 @@ async function fetchWithCacheAndRetry(url, config = {}, retries = 2, delayMs = 5
     }
   }
 
+  if (Date.now() < jikanDownUntil) {
+    throw new Error(`Jikan marked down after a recent failure, skipping live attempt for ${Math.ceil((jikanDownUntil - Date.now()) / 1000)}s more`);
+  }
+
   try {
     const response = await client.get(url, config);
     // Save to cache
@@ -35,6 +46,7 @@ async function fetchWithCacheAndRetry(url, config = {}, retries = 2, delayMs = 5
       timestamp: Date.now(),
       data: response.data,
     });
+    jikanDownUntil = 0;
 
     // Slight delay after successful request to be nice to the API
     await sleep(350);
@@ -55,6 +67,7 @@ async function fetchWithCacheAndRetry(url, config = {}, retries = 2, delayMs = 5
       await sleep(delayMs);
       return fetchWithCacheAndRetry(url, config, retries - 1, delayMs * 2);
     }
+    jikanDownUntil = Date.now() + DOWN_COOLDOWN_MS;
     throw error;
   }
 }
