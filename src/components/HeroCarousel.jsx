@@ -311,7 +311,7 @@ export default function HeroCarousel({ onClickManga, mangaList, useLiveApi = tru
               </div>
 
               {/* Right side manga cover (hidden on small screens) */}
-              <div className="hidden lg:block flex-shrink-0 ml-8">
+              <div className="hidden lg:block flex-shrink-0 ml-auto">
                 <div className="relative">
                   {/* overflow-hidden on this wrapper clips the scale-105 hover transform within rounded-xl */}
                   <div className="overflow-hidden rounded-xl shadow-2xl border-2 border-white/10 w-44 h-60">
