@@ -44,7 +44,7 @@ export default function ReadingHistoryPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.data.success) {
-        setHistory(res.data.history);
+        setHistory(res.data.history || []);
       }
     } catch (err) {
       setError('Gagal memuat riwayat baca. Coba lagi.');
@@ -89,7 +89,7 @@ export default function ReadingHistoryPage() {
             Reading History
           </h1>
           <p className="text-sm text-brand-textMuted mt-1">
-            {history.length > 0
+            {history?.length > 0
               ? `${history.length} manga yang pernah kamu baca`
               : 'Belum ada riwayat baca'}
           </p>
@@ -112,7 +112,7 @@ export default function ReadingHistoryPage() {
       )}
 
       {/* Loading skeleton */}
-      {loading && history.length === 0 && (
+      {loading && history?.length === 0 && (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-20 rounded-xl bg-brand-cardBg border border-brand-border animate-pulse" />
@@ -121,7 +121,7 @@ export default function ReadingHistoryPage() {
       )}
 
       {/* Empty state */}
-      {!loading && history.length === 0 && !error && (
+      {!loading && history?.length === 0 && !error && (
         <div className="flex flex-col items-center justify-center py-24 px-4 text-center rounded-2xl border border-dashed border-brand-border/60 bg-brand-cardBg/30">
           <BookOpen className="h-14 w-14 text-brand-textMuted/30 mb-4" />
           <h2 className="text-lg font-bold text-brand-textMain mb-2">Belum Ada Riwayat Baca</h2>
@@ -138,7 +138,7 @@ export default function ReadingHistoryPage() {
       )}
 
       {/* History list */}
-      {history.length > 0 && (
+      {history?.length > 0 && (
         <motion.div
           variants={containerVariants}
           initial="hidden"

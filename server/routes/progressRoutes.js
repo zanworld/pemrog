@@ -4,6 +4,19 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// GET /api/progress/history
+router.get('/progress/history', authenticateToken, (req, res) => {
+  try {
+    const history = db.prepare(
+      'SELECT manga_id, chapter_id, last_page, updated_at FROM reading_progress WHERE user_id = ? ORDER BY updated_at DESC LIMIT 50'
+    ).all(req.user.id);
+    res.json({ success: true, history });
+  } catch (error) {
+    console.error('Progress history error:', error);
+    res.status(500).json({ success: false, message: 'Gagal mengambil riwayat baca' });
+  }
+});
+
 // GET /api/progress/:mangaId
 router.get('/progress/:mangaId', authenticateToken, (req, res) => {
   try {
