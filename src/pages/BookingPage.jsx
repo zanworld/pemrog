@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import CalendarPicker from '../components/CalendarPicker';
 
 export default function BookingPage() {
   const navigate = useNavigate();
@@ -77,6 +78,15 @@ export default function BookingPage() {
   const handleNextStep = () => {
     if (!formData.date) {
       toast.error('Silakan pilih tanggal terlebih dahulu.');
+      return;
+    }
+    // Double-check: selected date must be >= today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [y, m, d] = formData.date.split('-').map(Number);
+    const selected = new Date(y, m - 1, d);
+    if (selected < today) {
+      toast.error('Tanggal yang dipilih sudah lewat. Pilih tanggal hari ini atau yang akan datang.');
       return;
     }
     if (!formData.slot) {
@@ -155,16 +165,12 @@ export default function BookingPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-brand-textMuted mb-2">Tanggal Kedatangan</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-brand-textMuted" />
-                    <input 
-                      type="date"
-                      min={new Date().toISOString().split('T')[0]}
-                      value={formData.date}
-                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-brand-border bg-brand-darkBg text-brand-textMain focus:ring-2 focus:ring-brand-orange focus:border-transparent outline-none transition-all"
-                    />
-                  </div>
+                  <CalendarPicker
+                    value={formData.date}
+                    onChange={(date) => setFormData({ ...formData, date })}
+                    minDate={new Date().toISOString().split('T')[0]}
+                    placeholder="Klik untuk pilih tanggal"
+                  />
                 </div>
 
                 <div>

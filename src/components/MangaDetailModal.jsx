@@ -1,5 +1,9 @@
 import React from 'react';
-import { X, Star, Heart, Calendar, BookOpen, User, BookOpenCheck, TrendingUp } from 'lucide-react';
+import { X, Star, Heart, Calendar, BookOpen, User, BookOpenCheck, TrendingUp, Clock, Bookmark, Check } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
+import toast from 'react-hot-toast';
+import { addToReadLater, removeFromReadLater, isInReadLater } from '../pages/ReadLaterPage';
 
 export default function MangaDetailModal({ manga, onClose, isFavorite, onToggleFavorite, onInteractiveFilter }) {
   if (!manga) return null;
@@ -20,6 +24,24 @@ export default function MangaDetailModal({ manga, onClose, isFavorite, onToggleF
   const authors = manga.authors || [];
 
   const [chapterCount, setChapterCount] = React.useState(null);
+  const [inReadLater, setInReadLater] = React.useState(() => isInReadLater(manga));
+  const [isBookmarked, setIsBookmarked] = React.useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = React.useState(false);
+
+  const { isAuthenticated, token } = useAuth();
+
+  // Check if already bookmarked
+  React.useEffect(() => {
+    if (!isAuthenticated || !token) return;
+    axios.get('/api/bookmarks', { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => {
+        if (res.data.success) {
+          const mangaId = String(manga.id || manga.mal_id);
+          setIsBookmarked(res.data.bookmarks.some(b => String(b.manga_id) === mangaId));
+        }
+      })
+      .catch(() => {});
+  }, [isAuthenticated, token, manga.id, manga.mal_id]);
 
   React.useEffect(() => {
     if (manga.source === 'mangadex' && !manga.chapters) {
@@ -36,6 +58,48 @@ export default function MangaDetailModal({ manga, onClose, isFavorite, onToggleF
   }, [manga.id, manga.mal_id, manga.source, manga.chapters]);
 
   const chaptersDisplay = manga.chapters || (chapterCount ? `${chapterCount}+` : 'Unknown');
+
+  const handleReadLater = () => {
+    if (inReadLater) {
+      removeFromReadLater(manga.id || manga.mal_id);
+      setInReadLater(false);
+      toast.success('Dihapus dari Read Later');
+    } else {
+      addToReadLater(manga);
+      setInReadLater(true);
+      toast.success('Ditambahkan ke Read Later');
+    }
+  };
+
+  const handleBookmark = async () => {
+    if (!isAuthenticated) {
+      toast.error('Login untuk bookmark manga');
+      return;
+    }
+    if (bookmarkLoading) return;
+    setBookmarkLoading(true);
+    try {
+      const mangaId = String(manga.id || manga.mal_id);
+      if (isBookmarked) {
+        await axios.delete(`/api/bookmarks/${mangaId}`, { headers: { Authorization: `Bearer ${token}` } });
+        setIsBookmarked(false);
+        toast.success('Bookmark dihapus');
+      } else {
+        const imageUrl = manga.images?.jpg?.large_image_url || manga.images?.jpg?.image_url || '';
+        await axios.post('/api/bookmarks', {
+          manga_id: mangaId,
+          manga_title: manga.title || manga.title_english || '',
+          manga_image: imageUrl,
+        }, { headers: { Authorization: `Bearer ${token}` } });
+        setIsBookmarked(true);
+        toast.success('Ditambahkan ke Bookmarks');
+      }
+    } catch (err) {
+      toast.error('Gagal memperbarui bookmark');
+    } finally {
+      setBookmarkLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 overflow-y-auto">
@@ -86,6 +150,33 @@ export default function MangaDetailModal({ manga, onClose, isFavorite, onToggleF
                 >
                   <Heart className={`h-4 w-4 ${isFavorite ? 'fill-brand-orange' : ''}`} />
                   {isFavorite ? 'Remove Favorite' : 'Add to Shelf'}
+                </button>
+
+                {/* Read Later button */}
+                <button
+                  onClick={handleReadLater}
+                  className={`w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all duration-200 border ${
+                    inReadLater
+                      ? 'bg-blue-500/10 border-blue-400 text-blue-400 hover:bg-blue-500/20'
+                      : 'bg-brand-darkBg hover:bg-brand-cardBg border-brand-border text-brand-textMain'
+                  }`}
+                >
+                  <Clock className="h-4 w-4" />
+                  {inReadLater ? 'Hapus dari Read Later' : 'Baca Nanti'}
+                </button>
+
+                {/* Bookmark button */}
+                <button
+                  onClick={handleBookmark}
+                  disabled={bookmarkLoading}
+                  className={`w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all duration-200 border ${
+                    isBookmarked
+                      ? 'bg-emerald-500/10 border-emerald-400 text-emerald-400 hover:bg-emerald-500/20'
+                      : 'bg-brand-darkBg hover:bg-brand-cardBg border-brand-border text-brand-textMain'
+                  } ${bookmarkLoading ? 'opacity-60 cursor-wait' : ''}`}
+                >
+                  {isBookmarked ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+                  {isBookmarked ? 'Bookmarked' : 'Bookmark'}
                 </button>
               </div>
             </div>

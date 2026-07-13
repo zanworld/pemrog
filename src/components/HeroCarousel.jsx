@@ -313,13 +313,16 @@ export default function HeroCarousel({ onClickManga, mangaList, useLiveApi = tru
               {/* Right side manga cover (hidden on small screens) */}
               <div className="hidden lg:block flex-shrink-0 ml-8">
                 <div className="relative">
-                  {imageUrl && (
-                    <img
-                      src={imageUrl}
-                      alt={title}
-                      className="w-44 h-60 object-cover rounded-xl shadow-2xl border-2 border-white/10 transition-transform duration-500 hover:scale-105"
-                    />
-                  )}
+                  {/* overflow-hidden on this wrapper clips the scale-105 hover transform within rounded-xl */}
+                  <div className="overflow-hidden rounded-xl shadow-2xl border-2 border-white/10 w-44 h-60">
+                    {imageUrl && (
+                      <img
+                        src={imageUrl}
+                        alt={title}
+                        className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                      />
+                    )}
+                  </div>
                   <div className={`absolute -inset-1 rounded-xl bg-gradient-to-br ${current.accentColor} opacity-20 -z-10 blur-md`} />
                 </div>
               </div>

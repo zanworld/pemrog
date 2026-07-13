@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Star, Heart, Bookmark } from 'lucide-react';
+import { Star, Heart, Bookmark, Clock } from 'lucide-react';
 import DataSourceBadge from './DataSourceBadge';
+import { addToReadLater, removeFromReadLater, isInReadLater, getReadLaterList } from '../pages/ReadLaterPage';
 
 export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClickCard }) {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClick
   const genres = manga.genres?.slice(0, 2).map(g => g.name) || [];
 
   const [chapterCount, setChapterCount] = React.useState(null);
+  const [inReadLater, setInReadLater] = React.useState(() => isInReadLater(manga));
 
   React.useEffect(() => {
     if (manga.source === 'mangadex' && !manga.chapters) {
@@ -34,8 +36,19 @@ export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClick
   const chaptersDisplay = manga.chapters || (chapterCount ? `${chapterCount}+` : '?');
 
   const handleFavoriteClick = (e) => {
-    e.stopPropagation(); // Prevent opening modal
+    e.stopPropagation();
     onToggleFavorite(manga);
+  };
+
+  const handleReadLaterClick = (e) => {
+    e.stopPropagation();
+    if (inReadLater) {
+      removeFromReadLater(manga.id || manga.mal_id);
+      setInReadLater(false);
+    } else {
+      addToReadLater(manga);
+      setInReadLater(true);
+    }
   };
 
   return (
@@ -80,6 +93,19 @@ export default function MangaCard({ manga, isFavorite, onToggleFavorite, onClick
           className="absolute right-3 bottom-3 flex h-9 w-9 items-center justify-center rounded-full bg-brand-darkBg/95 text-brand-textMuted border border-brand-border/60 transition-all duration-200 hover:text-brand-orange hover:border-brand-orange/30 hover:scale-110 shadow-sm"
         >
           <Heart className={`h-4.5 w-4.5 transition-colors ${isFavorite ? 'fill-brand-orange text-brand-orange' : 'text-brand-textMuted'}`} />
+        </button>
+
+        {/* Read Later Button */}
+        <button
+          onClick={handleReadLaterClick}
+          aria-label={inReadLater ? "Remove from Read Later" : "Add to Read Later"}
+          className={`absolute right-14 bottom-3 flex h-9 w-9 items-center justify-center rounded-full bg-brand-darkBg/95 border transition-all duration-200 hover:scale-110 shadow-sm ${
+            inReadLater
+              ? 'text-blue-400 border-blue-400/40 hover:bg-blue-400/10'
+              : 'text-brand-textMuted border-brand-border/60 hover:text-blue-400 hover:border-blue-400/30'
+          }`}
+        >
+          <Clock className="h-4 w-4" />
         </button>
       </div>
 

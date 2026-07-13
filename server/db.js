@@ -73,6 +73,54 @@ export const initDB = () => {
       console.error('Error migrating reading_progress table:', migErr.message);
     }
 
+    // --- Bookmarks table migration: add manga_title/manga_image columns & convert manga_id to TEXT ---
+    try {
+      const bmInfo = db.prepare("PRAGMA table_info(bookmarks)").all();
+      const hasMangaTitle = bmInfo.some(col => col.name === 'manga_title');
+      const hasMangaImage = bmInfo.some(col => col.name === 'manga_image');
+      const bmMangaIdCol = bmInfo.find(col => col.name === 'manga_id');
+
+      // Add new metadata columns if missing (safe ALTER TABLE)
+      if (!hasMangaTitle) {
+        db.exec("ALTER TABLE bookmarks ADD COLUMN manga_title TEXT");
+        console.log('🔄 Added manga_title column to bookmarks table.');
+      }
+      if (!hasMangaImage) {
+        db.exec("ALTER TABLE bookmarks ADD COLUMN manga_image TEXT");
+        console.log('🔄 Added manga_image column to bookmarks table.');
+      }
+
+      // Migrate manga_id from INTEGER to TEXT if needed
+      if (bmMangaIdCol && bmMangaIdCol.type.toUpperCase() === 'INTEGER') {
+        console.log('🔄 Migrating bookmarks manga_id column to TEXT...');
+        db.transaction(() => {
+          const tempExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='bookmarks_backup'").get();
+          if (tempExists) db.exec("DROP TABLE bookmarks_backup");
+          db.exec("ALTER TABLE bookmarks RENAME TO bookmarks_backup");
+          db.exec(`
+            CREATE TABLE bookmarks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                manga_id TEXT NOT NULL,
+                manga_title TEXT,
+                manga_image TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(user_id, manga_id)
+            );
+          `);
+          db.exec(`
+            INSERT INTO bookmarks (id, user_id, manga_id, created_at)
+            SELECT id, user_id, CAST(manga_id AS TEXT), created_at FROM bookmarks_backup
+          `);
+          db.exec("DROP TABLE bookmarks_backup");
+        })();
+        console.log('✅ bookmarks table migrated to TEXT successfully.');
+      }
+    } catch (bmMigErr) {
+      console.error('Error migrating bookmarks table:', bmMigErr.message);
+    }
+
     console.log('✅ Database schema initialized successfully.');
   } else {
     console.warn('⚠️ schema.sql not found. Skipping schema initialization.');

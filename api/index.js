@@ -111,8 +111,8 @@ app.delete('/api/favorites/:mangaId', authenticateToken, (req, res) => {
 // Bookmarks CRUD (Similar structure)
 app.get('/api/bookmarks', authenticateToken, (req, res) => {
   try {
-    const bookmarks = db.prepare('SELECT manga_id FROM bookmarks WHERE user_id = ?').all(req.user.id);
-    res.json({ success: true, bookmarks: bookmarks.map(b => b.manga_id) });
+    const bookmarks = db.prepare('SELECT manga_id, manga_title, manga_image, created_at FROM bookmarks WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
+    res.json({ success: true, bookmarks });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -120,8 +120,8 @@ app.get('/api/bookmarks', authenticateToken, (req, res) => {
 
 app.post('/api/bookmarks', authenticateToken, (req, res) => {
   try {
-    const { manga_id } = req.body;
-    db.prepare('INSERT OR IGNORE INTO bookmarks (user_id, manga_id) VALUES (?, ?)').run(req.user.id, manga_id);
+    const { manga_id, manga_title, manga_image } = req.body;
+    db.prepare('INSERT OR IGNORE INTO bookmarks (user_id, manga_id, manga_title, manga_image) VALUES (?, ?, ?, ?)').run(req.user.id, String(manga_id), manga_title || null, manga_image || null);
     res.json({ success: true, message: 'Added to bookmarks' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -137,6 +137,19 @@ app.delete('/api/bookmarks/:mangaId', authenticateToken, (req, res) => {
   }
 });
 
+
+// Reading Progress History (all entries for the current user)
+app.get('/api/progress/history', authenticateToken, (req, res) => {
+  try {
+    const history = db.prepare(
+      'SELECT manga_id, chapter_id, last_page, updated_at FROM reading_progress WHERE user_id = ? ORDER BY updated_at DESC LIMIT 50'
+    ).all(req.user.id);
+    res.json({ success: true, history });
+  } catch (error) {
+    console.error('Progress history error:', error);
+    res.status(500).json({ success: false, message: 'Gagal mengambil riwayat baca' });
+  }
+});
 
 // Start local server if not running in Vercel serverless environment
 if (!process.env.VERCEL) {
