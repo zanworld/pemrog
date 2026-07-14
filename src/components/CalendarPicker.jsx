@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const DAYS = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
@@ -51,6 +52,29 @@ export default function CalendarPicker({ value, onChange, minDate, placeholder =
 
   const wrapperRef = useRef(null);
   const buttonRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const [position, setPosition] = useState(null);
+
+  // Dropdown is rendered via a portal into document.body (see below) so it can escape any
+  // ancestor with overflow-hidden — its position has to be computed manually from the
+  // trigger button's viewport rect instead of relying on CSS position:absolute + a parent.
+  const updatePosition = useCallback(() => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    setPosition({ top: rect.bottom + 8, left: rect.left });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePosition();
+    // capture:true so scroll events from any scrollable ancestor are caught, not just window
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [open, updatePosition]);
 
   // Sync view when selected value changes from the outside (e.g. form reset)
   useEffect(() => {
@@ -64,10 +88,14 @@ export default function CalendarPicker({ value, onChange, minDate, placeholder =
     }
   }, [value]);
 
-  // Close on outside click
+  // Close on outside click. The dropdown is portaled to document.body, so it's no longer
+  // inside wrapperRef's DOM subtree — it needs its own containment check, otherwise every
+  // click inside the dropdown itself would register as "outside" and close it immediately.
   useEffect(() => {
     const handleClick = (e) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+      const insideWrapper = wrapperRef.current && wrapperRef.current.contains(e.target);
+      const insideDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
+      if (!insideWrapper && !insideDropdown) {
         setOpen(false);
       }
     };
@@ -181,11 +209,19 @@ export default function CalendarPicker({ value, onChange, minDate, placeholder =
         </span>
       </button>
 
-      {/* Calendar dropdown */}
-      {open && (
+      {/* Calendar dropdown — portaled to document.body so it can render past any ancestor's
+          overflow-hidden (e.g. BookingPage's glass-panel card clips its slide-transition
+          content). Position is computed manually from the trigger button's rect since it's
+          no longer a CSS-positioned child of this wrapper. */}
+      {open && position && createPortal(
         <div
-          className="absolute left-0 top-full mt-2 z-50 w-72 rounded-2xl border border-brand-border bg-brand-cardBg shadow-2xl p-4 animate-fade-in"
-          style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,107,0,0.08)' }}
+          ref={dropdownRef}
+          className="fixed z-50 w-72 rounded-2xl border border-brand-border bg-brand-cardBg shadow-2xl p-4 animate-fade-in"
+          style={{
+            top: position.top,
+            left: position.left,
+            boxShadow: '0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,107,0,0.08)',
+          }}
         >
           {/* Month / Year navigation */}
           <div className="flex items-center justify-between mb-4">
@@ -244,7 +280,8 @@ export default function CalendarPicker({ value, onChange, minDate, placeholder =
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
